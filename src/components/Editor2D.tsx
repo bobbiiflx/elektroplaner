@@ -1,0 +1,935 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Maximize, Minus, Plus } from 'lucide-react'
+import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, type DeviceCategory } from '../config/catalog'
+import { useFloor, useStore } from '../store'
+import type { CableNode, Floor, Vec2, Wall } from '../types'
+import {
+  boundsOf,
+  clamp,
+  dist,
+  nearestWall,
+  pointOnWall,
+  projectOnWall,
+  uid,
+  wallAngleDeg,
+  wallLength,
+  wallNormal,
+} from '../lib/geom'
+import { findJoined, moveEnds, syncDeviceNodes, type WallEnd } from '../lib/link'
+import { formatLen } from '../lib/units'
+import { LenField } from './NumberField'
+import { ToolOptionsBar } from './ToolOptionsBar'
+import { Modal } from './ui'
+
+type Drag =
+  | { kind: 'pan'; sx: number; sy: number; tx0: number; ty0: number }
+  | { kind: 'device'; id: string }
+  | { kind: 'opening'; id: string }
+  | { kind: 'wallEnd'; id: string; end: 'a' | 'b'; joined: WallEnd[] }
+  | { kind: 'cableNode'; id: string; idx: number }
+
+interface View {
+  tx: number
+  ty: number
+  s: number // Pixel pro mm
+}
+
+const MIN_S = 0.004
+const MAX_S = 4
+
+const HINTS: Record<string, string> = {
+  select: 'Element anklicken zum Bearbeiten · Ziehen verschiebt · Leertaste + Ziehen verschiebt die Ansicht',
+  wall: 'Klicken setzt Punkte · Doppelklick, Enter oder Rechtsklick beendet · Shift schaltet „rechtwinklig“ um',
+  opening: 'Auf eine Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
+  device: 'Auf eine Wand klicken, um das Gerät zu setzen',
+  cable: 'Klicken setzt Leitungspunkte (Höhe oben einstellen) · Enter beendet · Gerät anklicken verbindet',
+  calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
+}
+
+export default function Editor2D() {
+  const floor = useFloor()
+  const project = useStore((s) => s.project)
+  const backgrounds = useStore((s) => s.backgrounds)
+  const selection = useStore((s) => s.selection)
+  const tool = useStore((s) => s.tool)
+  const opts = useStore((s) => s.opts)
+  const unit = useStore((s) => s.unit)
+  const edit = useStore((s) => s.edit)
+  const select = useStore((s) => s.select)
+  const setTool = useStore((s) => s.setTool)
+  const showToast = useStore((s) => s.showToast)
+
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<Drag | null>(null)
+  const spaceRef = useRef(false)
+
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  const [view, setView] = useState<View>({ tx: 40, ty: 40, s: 0.1 })
+  const [cursor, setCursor] = useState<Vec2 | null>(null)
+  const [panning, setPanning] = useState(false)
+  const [draft, setDraft] = useState<{ first: Vec2; last: Vec2 } | null>(null)
+  const [cableDraft, setCableDraft] = useState<CableNode[]>([])
+  const [calib, setCalib] = useState<{ a?: Vec2; b?: Vec2 }>({})
+  const [calibReal, setCalibReal] = useState(0)
+
+  const settings = project.settings
+  const bg = floor.background
+  const bgUrl = backgrounds[floor.id]
+  const s = view.s
+
+  // --- Größe & Einpassen --------------------------------------------------
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
+    ro.observe(el)
+    setSize({ w: el.clientWidth, h: el.clientHeight })
+    return () => ro.disconnect()
+  }, [])
+
+  const fit = useCallback(() => {
+    if (size.w < 50 || size.h < 50) return
+    const pts: Vec2[] = []
+    // Mit gezeichneten Wänden auf diese einpassen, sonst auf den ganzen Grundriss
+    if (floor.walls.length) {
+      for (const w of floor.walls) pts.push(w.a, w.b)
+    } else if (bg) {
+      pts.push({ x: 0, y: 0 }, { x: bg.width * bg.mmPerPx, y: bg.height * bg.mmPerPx })
+    }
+    const b = boundsOf(pts) ?? { minX: 0, minY: 0, maxX: 10000, maxY: 8000 }
+    // Platz für Werkzeugleiste (links), Optionsleiste (oben), Zoom (rechts) und Statuszeile lassen
+    const padL = 84
+    const padR = 64
+    const padT = 76
+    const padB = 52
+    const w = Math.max(b.maxX - b.minX, 1000)
+    const h = Math.max(b.maxY - b.minY, 1000)
+    const availW = size.w - padL - padR
+    const availH = size.h - padT - padB
+    const sc = clamp(Math.min(availW / w, availH / h), MIN_S, MAX_S)
+    setView({
+      s: sc,
+      tx: padL + (availW - w * sc) / 2 - b.minX * sc,
+      ty: padT + (availH - h * sc) / 2 - b.minY * sc,
+    })
+  }, [size.w, size.h, bg, floor.walls])
+
+  const fittedKey = useRef('')
+  useEffect(() => {
+    if (size.w < 50) return
+    const key = `${project.id}|${floor.id}|${bg?.width ?? 0}|${bg?.mmPerPx ?? 0}`
+    if (fittedKey.current !== key) {
+      fittedKey.current = key
+      fit()
+    }
+  }, [size.w, size.h, project.id, floor.id, bg?.width, bg?.mmPerPx, fit])
+
+  // --- Zoom per Mausrad / Trackpad ----------------------------------------
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = svg.getBoundingClientRect()
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
+      if (e.shiftKey && !e.ctrlKey) {
+        setView((v) => ({ ...v, tx: v.tx - (e.deltaX || e.deltaY), ty: v.ty }))
+        return
+      }
+      const k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))
+      setView((v) => {
+        const ns = clamp(v.s * k, MIN_S, MAX_S)
+        const f = ns / v.s
+        return { s: ns, tx: sx - (sx - v.tx) * f, ty: sy - (sy - v.ty) * f }
+      })
+    }
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+  }, [])
+
+  const zoomBy = (k: number) => {
+    setView((v) => {
+      const ns = clamp(v.s * k, MIN_S, MAX_S)
+      const f = ns / v.s
+      const cx = size.w / 2
+      const cy = size.h / 2
+      return { s: ns, tx: cx - (cx - v.tx) * f, ty: cy - (cy - v.ty) * f }
+    })
+  }
+
+  const toPlan = (clientX: number, clientY: number): Vec2 => {
+    const rect = svgRef.current!.getBoundingClientRect()
+    return { x: (clientX - rect.left - view.tx) / view.s, y: (clientY - rect.top - view.ty) / view.s }
+  }
+
+  // --- Tastatur ------------------------------------------------------------
+  const cancelDrafts = useCallback(() => {
+    setDraft(null)
+    setCableDraft([])
+    setCalib({})
+  }, [])
+
+  const finishCable = useCallback(() => {
+    if (cableDraft.length < 2) {
+      setCableDraft([])
+      return
+    }
+    const ct = cableType(opts.cableTypeId)
+    const id = uid('c_')
+    edit((p) => {
+      const f = p.floors.find((x) => x.id === floor.id)
+      f?.cables.push({
+        id,
+        typeId: ct.id,
+        points: cableDraft,
+        fuseA: ct.defaultFuse ?? 16,
+        method: 'B2',
+        charac: 'B',
+      })
+    })
+    setCableDraft([])
+    select({ kind: 'cable', id })
+  }, [cableDraft, opts.cableTypeId, edit, floor.id, select])
+
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')
+    }
+    const down = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return
+      if (e.code === 'Space') {
+        spaceRef.current = true
+        e.preventDefault()
+      } else if (e.key === 'Escape') {
+        if (draft || cableDraft.length || calib.a) cancelDrafts()
+        else setTool('select')
+      } else if (e.key === 'Enter') {
+        if (tool === 'cable') finishCable()
+        else setDraft(null)
+      } else if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
+        fit()
+      }
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') spaceRef.current = false
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [draft, cableDraft, calib.a, tool, cancelDrafts, finishCable, fit, setTool])
+
+  useEffect(() => {
+    cancelDrafts()
+  }, [tool, floor.id, cancelDrafts])
+
+  // --- Einrasten -----------------------------------------------------------
+  const snap = (
+    raw: Vec2,
+    from: Vec2 | undefined,
+    ortho: boolean,
+    preferWallLine = false,
+    skip?: WallEnd[],
+  ): { p: Vec2; kind: 'node' | 'wall' | 'grid' } => {
+    const tol = 14 / s
+    const g = settings.grid
+    let best: Vec2 | null = null
+    let bd = tol
+    const nodes: Vec2[] = []
+    const skipIds = new Set((skip ?? []).map((e) => e.id))
+    for (const w of floor.walls) {
+      if (!skip?.some((e) => e.id === w.id && e.end === 'a')) nodes.push(w.a)
+      if (!skip?.some((e) => e.id === w.id && e.end === 'b')) nodes.push(w.b)
+    }
+    if (draft) nodes.push(draft.first)
+    for (const q of nodes) {
+      const d = dist(q, raw)
+      if (d < bd) {
+        bd = d
+        best = q
+      }
+    }
+    if (best) return { p: { x: best.x, y: best.y }, kind: 'node' }
+
+    if (preferWallLine || !(from && ortho)) {
+      const hit = nearestWall(
+        skipIds.size ? floor.walls.filter((w) => !skipIds.has(w.id)) : floor.walls,
+        raw,
+        tol * (preferWallLine ? 1.6 : 1),
+      )
+      if (hit) {
+        const q = pointOnWall(hit.wall, hit.t)
+        const w = hit.wall
+        if (Math.abs(w.a.y - w.b.y) < 1e-6) q.x = Math.round(q.x / g) * g
+        else if (Math.abs(w.a.x - w.b.x) < 1e-6) q.y = Math.round(q.y / g) * g
+        return { p: q, kind: 'wall' }
+      }
+    }
+
+    const p = { ...raw }
+    if (from && ortho) {
+      if (Math.abs(p.x - from.x) >= Math.abs(p.y - from.y)) {
+        p.y = from.y
+        p.x = Math.round(p.x / g) * g
+      } else {
+        p.x = from.x
+        p.y = Math.round(p.y / g) * g
+      }
+    } else {
+      p.x = Math.round(p.x / g) * g
+      p.y = Math.round(p.y / g) * g
+    }
+    return { p, kind: 'grid' }
+  }
+
+  const devicePos = (f: Floor, id: string): { face: Vec2; center: Vec2; wall: Wall } | null => {
+    const d = f.devices.find((x) => x.id === id)
+    const w = d && f.walls.find((x) => x.id === d.wallId)
+    if (!d || !w) return null
+    return {
+      face: pointOnWall(w, d.offset, d.side, w.thickness / 2),
+      center: pointOnWall(w, d.offset),
+      wall: w,
+    }
+  }
+
+  // --- Zeichen-Aktionen ----------------------------------------------------
+  const addWallPoint = (p: Vec2) => {
+    if (!draft) {
+      setDraft({ first: p, last: p })
+      return
+    }
+    if (dist(draft.last, p) < 20) return
+    const kind = opts.wallKind
+    const thickness = kind === 'outer' ? settings.outerThickness : settings.innerThickness
+    edit((pr) => {
+      const f = pr.floors.find((x) => x.id === floor.id)
+      f?.walls.push({ id: uid('w_'), a: draft.last, b: p, thickness, kind })
+    })
+    const closed = dist(p, draft.first) < 1
+    setDraft(closed ? null : { first: draft.first, last: p })
+  }
+
+  const placeOpening = (raw: Vec2) => {
+    const hit = nearestWall(floor.walls, raw, 400)
+    if (!hit) {
+      showToast('Zum Platzieren auf eine Wand klicken.')
+      return
+    }
+    const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+    const L = wallLength(hit.wall)
+    const width = Math.min(def.width, L)
+    const id = uid('o_')
+    edit((p) => {
+      const f = p.floors.find((x) => x.id === floor.id)
+      f?.openings.push({
+        id,
+        wallId: hit.wall.id,
+        type: opts.openingType,
+        offset: clamp(hit.t - width / 2, 0, L - width),
+        width,
+        height: def.height,
+        sill: def.sill,
+      })
+    })
+    select({ kind: 'opening', id })
+  }
+
+  const placeDevice = (raw: Vec2) => {
+    const hit = nearestWall(floor.walls, raw, 400)
+    if (!hit) {
+      showToast('Zum Platzieren auf eine Wand klicken.')
+      return
+    }
+    const dt = deviceType(opts.deviceTypeId)
+    const id = uid('d_')
+    edit((p) => {
+      const f = p.floors.find((x) => x.id === floor.id)
+      f?.devices.push({
+        id,
+        typeId: dt.id,
+        wallId: hit.wall.id,
+        offset: hit.t,
+        side: hit.signed >= 0 ? 1 : -1,
+        height: dt.defaultHeight,
+      })
+    })
+    select({ kind: 'device', id })
+  }
+
+  const addCableNode = (raw: Vec2, orthoNow: boolean) => {
+    // 1. Gerät einrasten
+    const tol = 18 / s
+    for (const d of floor.devices) {
+      const pos = devicePos(floor, d.id)
+      if (!pos) continue
+      if (dist(pos.face, raw) <= tol || dist(pos.center, raw) <= tol) {
+        const node: CableNode = { x: pos.center.x, y: pos.center.y, z: d.height, deviceId: d.id }
+        pushNode(node)
+        return
+      }
+    }
+    // 2. Wandmittellinie / Raster
+    const last = cableDraft[cableDraft.length - 1]
+    const { p } = snap(raw, last ? { x: last.x, y: last.y } : undefined, orthoNow, true)
+    pushNode({ x: p.x, y: p.y, z: opts.cableZ })
+  }
+
+  const pushNode = (n: CableNode) => {
+    const last = cableDraft[cableDraft.length - 1]
+    if (last && dist(last, n) < 1 && Math.abs(last.z - n.z) < 1) return
+    setCableDraft([...cableDraft, n])
+  }
+
+  const addVertical = () => {
+    const last = cableDraft[cableDraft.length - 1]
+    if (!last) return
+    if (Math.abs(last.z - opts.cableZ) < 1) {
+      showToast('Andere Höhe im Feld „Höhe“ einstellen, dann „Senkrecht“.')
+      return
+    }
+    setCableDraft([...cableDraft, { x: last.x, y: last.y, z: opts.cableZ }])
+  }
+
+  const addCalibPoint = (raw: Vec2) => {
+    if (!bg) {
+      showToast('Zuerst einen Grundriss laden.')
+      return
+    }
+    if (!calib.a || calib.b) {
+      setCalib({ a: raw })
+    } else {
+      const measured = dist(calib.a, raw)
+      if (measured < 1) return
+      setCalib({ a: calib.a, b: raw })
+      setCalibReal(Math.round(measured))
+    }
+  }
+
+  const applyCalibration = () => {
+    if (!calib.a || !calib.b || !bg || calibReal <= 0) return
+    const measured = dist(calib.a, calib.b)
+    const factor = calibReal / measured
+    edit((p) => {
+      const f = p.floors.find((x) => x.id === floor.id)
+      if (f?.background) f.background.mmPerPx *= factor
+    })
+    setCalib({})
+    setTool('select')
+    showToast(`Maßstab gesetzt – 1 Pixel entspricht ${(bg.mmPerPx * factor).toFixed(2).replace('.', ',')} mm.`)
+  }
+
+  // --- Zeiger --------------------------------------------------------------
+  const startPan = (e: React.PointerEvent) => {
+    dragRef.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty }
+    setPanning(true)
+    svgRef.current?.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
+      startPan(e)
+      return
+    }
+    if (e.button !== 0) return
+    const raw = toPlan(e.clientX, e.clientY)
+    const orthoNow = opts.ortho !== e.shiftKey
+    switch (tool) {
+      case 'select':
+        select(null)
+        startPan(e)
+        break
+      case 'wall': {
+        const { p } = snap(raw, draft?.last, orthoNow)
+        addWallPoint(p)
+        break
+      }
+      case 'opening':
+        placeOpening(raw)
+        break
+      case 'device':
+        placeDevice(raw)
+        break
+      case 'cable':
+        addCableNode(raw, orthoNow)
+        break
+      case 'calibrate':
+        addCalibPoint(raw)
+        break
+    }
+  }
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const raw = toPlan(e.clientX, e.clientY)
+    setCursor(raw)
+    const d = dragRef.current
+    if (!d) return
+    if (d.kind === 'pan') {
+      setView((v) => ({ ...v, tx: d.tx0 + (e.clientX - d.sx), ty: d.ty0 + (e.clientY - d.sy) }))
+      return
+    }
+    if (d.kind === 'device') {
+      const hit = nearestWall(floor.walls, raw, 700)
+      if (!hit) return
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        const dv = f?.devices.find((x) => x.id === d.id)
+        if (!f || !dv) return
+        dv.wallId = hit.wall.id
+        dv.offset = hit.t
+        dv.side = hit.signed >= 0 ? 1 : -1
+        syncDeviceNodes(f, dv.id)
+      }, `dev:${d.id}`)
+    } else if (d.kind === 'opening') {
+      const hit = nearestWall(floor.walls, raw, 700)
+      if (!hit) return
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        const op = f?.openings.find((x) => x.id === d.id)
+        if (!op) return
+        const L = wallLength(hit.wall)
+        op.wallId = hit.wall.id
+        op.offset = clamp(hit.t - op.width / 2, 0, Math.max(0, L - op.width))
+      }, `open:${d.id}`)
+    } else if (d.kind === 'wallEnd') {
+      const { p: q } = snap(raw, undefined, false, false, d.joined)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (f) moveEnds(f, d.joined, q)
+      }, `wall:${d.id}:${d.end}`)
+    } else if (d.kind === 'cableNode') {
+      const { p: q } = snap(raw, undefined, false, true)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        const c = f?.cables.find((x) => x.id === d.id)
+        const n = c?.points[d.idx]
+        if (n) {
+          n.x = q.x
+          n.y = q.y
+        }
+      }, `cn:${d.id}:${d.idx}`)
+    }
+  }
+
+  const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (dragRef.current) {
+      dragRef.current = null
+      setPanning(false)
+      try {
+        svgRef.current?.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  const onDoubleClick = () => {
+    if (tool === 'wall') setDraft(null)
+    else if (tool === 'cable') finishCable()
+  }
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (tool === 'wall') setDraft(null)
+    else if (tool === 'cable') finishCable()
+  }
+
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable'; id: string }) => {
+    if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
+    e.stopPropagation()
+    if (sel) select(sel)
+    if (!drag) return
+    dragRef.current = drag
+    svgRef.current?.setPointerCapture(e.pointerId)
+  }
+
+  // --- Darstellung ---------------------------------------------------------
+  const px = (n: number) => n / s // Bildschirm-Pixel → mm
+  const vis = {
+    x0: -view.tx / s,
+    y0: -view.ty / s,
+    w: size.w / s,
+    h: size.h / s,
+  }
+  const g = settings.grid
+
+  const snapPreview = useMemo(() => {
+    if (!cursor) return null
+    if (tool === 'wall') return snap(cursor, draft?.last, opts.ortho).p
+    return null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, tool, draft, opts.ortho, floor.walls, s])
+
+  const ghost = useMemo(() => {
+    if (!cursor || (tool !== 'opening' && tool !== 'device')) return null
+    const hit = nearestWall(floor.walls, cursor, 400)
+    if (!hit) return null
+    return hit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, tool, floor.walls])
+
+  const label = (text: string, x: number, y: number, rot = 0, color = 'var(--ink)') => {
+    const flip = rot > 90 || rot < -90 ? rot + 180 : rot
+    return (
+      <text
+        x={x}
+        y={y}
+        transform={`rotate(${flip} ${x} ${y})`}
+        fontSize={px(12)}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        stroke="var(--paper)"
+        strokeWidth={px(3.5)}
+        style={{ paintOrder: 'stroke', pointerEvents: 'none', fontWeight: 600 }}
+      >
+        {text}
+      </text>
+    )
+  }
+
+  const wallLabel = (w: Wall, color?: string) => {
+    const mid = pointOnWall(w, wallLength(w) / 2)
+    const n = wallNormal(w)
+    const off = w.thickness / 2 + px(14)
+    return label(formatLen(wallLength(w), unit), mid.x + n.x * off, mid.y + n.y * off, wallAngleDeg(w), color)
+  }
+
+  const shape = (cat: DeviceCategory, r: number, fill: string, selected: boolean) => {
+    const stroke = selected ? 'var(--accent)' : 'var(--paper)'
+    const sw = selected ? px(2.5) : px(1.5)
+    switch (cat) {
+      case 'switch':
+        return <rect x={-r} y={-r} width={2 * r} height={2 * r} rx={r * 0.28} fill={fill} stroke={stroke} strokeWidth={sw} />
+      case 'data':
+        return <polygon points={`0,${-r * 1.15} ${r * 1.05},${r * 0.85} ${-r * 1.05},${r * 0.85}`} fill={fill} stroke={stroke} strokeWidth={sw} />
+      case 'knx':
+        return <polygon points={`0,${-r * 1.25} ${r * 1.25},0 0,${r * 1.25} ${-r * 1.25},0`} fill={fill} stroke={stroke} strokeWidth={sw} />
+      case 'display':
+        return <rect x={-r * 1.6} y={-r} width={r * 3.2} height={2 * r} rx={r * 0.25} fill={fill} stroke={stroke} strokeWidth={sw} />
+      case 'box':
+        return <rect x={-r * 0.8} y={-r * 0.8} width={r * 1.6} height={r * 1.6} fill="var(--paper)" stroke={fill} strokeWidth={px(2)} />
+      default:
+        return <circle r={r} fill={fill} stroke={stroke} strokeWidth={sw} />
+    }
+  }
+
+  const selWall = selection?.kind === 'wall' ? floor.walls.find((w) => w.id === selection.id) : undefined
+  const calibMeasured = calib.a && calib.b ? dist(calib.a, calib.b) : 0
+  const cursorStyle = panning ? 'grabbing' : tool === 'select' ? 'default' : 'crosshair'
+
+  return (
+    <div className="editor2d" ref={wrapRef}>
+      <svg
+        ref={svgRef}
+        className="plan"
+        style={{ cursor: cursorStyle }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={() => !dragRef.current && setCursor(null)}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+      >
+        <defs>
+          <pattern id="gridMinor" width={g} height={g} patternUnits="userSpaceOnUse">
+            <path d={`M ${g} 0 L 0 0 0 ${g}`} fill="none" stroke="var(--grid-minor)" strokeWidth={px(1)} />
+          </pattern>
+          <pattern id="gridMajor" width={1000} height={1000} patternUnits="userSpaceOnUse">
+            <path d="M 1000 0 L 0 0 0 1000" fill="none" stroke="var(--grid-major)" strokeWidth={px(1)} />
+          </pattern>
+        </defs>
+
+        <g transform={`translate(${view.tx} ${view.ty}) scale(${s})`}>
+          {bg && bgUrl && (
+            <image
+              href={bgUrl}
+              x={0}
+              y={0}
+              width={bg.width * bg.mmPerPx}
+              height={bg.height * bg.mmPerPx}
+              opacity={bg.opacity}
+              preserveAspectRatio="none"
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+          {g * s >= 7 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMinor)" style={{ pointerEvents: 'none' }} />}
+          {1000 * s >= 12 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMajor)" style={{ pointerEvents: 'none' }} />}
+
+          {/* Wände */}
+          {floor.walls.map((w) => {
+            const sel = selection?.kind === 'wall' && selection.id === w.id
+            return (
+              <line
+                key={w.id}
+                x1={w.a.x}
+                y1={w.a.y}
+                x2={w.b.x}
+                y2={w.b.y}
+                stroke={sel ? 'var(--accent)' : 'var(--wall)'}
+                strokeWidth={w.thickness}
+                strokeLinecap="square"
+                opacity={0.92}
+                style={{ cursor: tool === 'select' ? 'pointer' : undefined }}
+                onPointerDown={(e) => beginElementDrag(e, null, { kind: 'wall', id: w.id })}
+              />
+            )
+          })}
+
+          {/* Öffnungen */}
+          {floor.openings.map((o) => {
+            const w = floor.walls.find((x) => x.id === o.wallId)
+            if (!w) return null
+            const sel = selection?.kind === 'opening' && selection.id === o.id
+            const t = w.thickness
+            return (
+              <g
+                key={o.id}
+                transform={`translate(${w.a.x} ${w.a.y}) rotate(${wallAngleDeg(w)})`}
+                style={{ cursor: tool === 'select' ? 'pointer' : undefined }}
+                onPointerDown={(e) => beginElementDrag(e, { kind: 'opening', id: o.id }, { kind: 'opening', id: o.id })}
+              >
+                <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="var(--paper)" />
+                {o.type === 'door' ? (
+                  <>
+                    <line x1={o.offset} y1={0} x2={o.offset} y2={o.width} stroke="var(--ink)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+                    <path d={`M ${o.offset} ${o.width} A ${o.width} ${o.width} 0 0 0 ${o.offset + o.width} 0`} fill="none" stroke="var(--ink-soft)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                  </>
+                ) : (
+                  <>
+                    <rect x={o.offset} y={-t / 2} width={o.width} height={t} fill="none" stroke="var(--ink)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+                    <line x1={o.offset} y1={0} x2={o.offset + o.width} y2={0} stroke="var(--ink)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+                  </>
+                )}
+                {sel && <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="none" stroke="var(--accent)" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
+              </g>
+            )
+          })}
+
+          {/* Leitungen (Draufsicht) */}
+          {floor.cables.map((c) => {
+            const ct = cableType(c.typeId)
+            const sel = selection?.kind === 'cable' && selection.id === c.id
+            const pts = c.points.map((p) => `${p.x},${p.y}`).join(' ')
+            return (
+              <g key={c.id}>
+                <polyline points={pts} fill="none" stroke="transparent" strokeWidth={14} vectorEffect="non-scaling-stroke" style={{ pointerEvents: tool === 'select' ? 'stroke' : 'none', cursor: 'pointer' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'cable', id: c.id })} />
+                <polyline points={pts} fill="none" stroke={ct.color} strokeWidth={sel ? 5 : 3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity={0.95} style={{ pointerEvents: 'none' }} />
+                {c.points.map((n, i) => {
+                  const prev = c.points[i - 1]
+                  const riser = (prev && dist(prev, n) < 1) || (c.points[i + 1] && dist(c.points[i + 1], n) < 1)
+                  if (!sel && !riser) return null
+                  return (
+                    <g key={i}>
+                      <circle
+                        cx={n.x}
+                        cy={n.y}
+                        r={px(sel ? 6 : 4)}
+                        fill={riser ? 'var(--paper)' : ct.color}
+                        stroke={ct.color}
+                        strokeWidth={px(2)}
+                        style={{ cursor: sel && !n.deviceId ? 'move' : undefined }}
+                        onPointerDown={(e) => !n.deviceId && sel && beginElementDrag(e, { kind: 'cableNode', id: c.id, idx: i })}
+                      />
+                      {sel && label(`${formatLen(n.z, unit, false)}`, n.x + px(14), n.y - px(12), 0, ct.color)}
+                    </g>
+                  )
+                })}
+              </g>
+            )
+          })}
+
+          {/* Geräte */}
+          {floor.devices.map((d) => {
+            const pos = devicePos(floor, d.id)
+            if (!pos) return null
+            const dt = deviceType(d.typeId)
+            const sel = selection?.kind === 'device' && selection.id === d.id
+            const r = Math.max(65, px(7.5))
+            return (
+              <g
+                key={d.id}
+                transform={`translate(${pos.face.x} ${pos.face.y})`}
+                style={{ cursor: tool === 'select' ? 'pointer' : undefined }}
+                onPointerDown={(e) => beginElementDrag(e, { kind: 'device', id: d.id }, { kind: 'device', id: d.id })}
+              >
+                {shape(dt.category, r, dt.color, sel)}
+                {sel && label(`${dt.name} · ${formatLen(d.height, unit)}`, 0, -r - px(12))}
+              </g>
+            )
+          })}
+
+          {/* Griffe der gewählten Wand */}
+          {selWall && tool === 'select' && (
+            <>
+              {(['a', 'b'] as const).map((end) => (
+                <circle
+                  key={end}
+                  cx={selWall[end].x}
+                  cy={selWall[end].y}
+                  r={px(7)}
+                  fill="var(--paper)"
+                  stroke="var(--accent)"
+                  strokeWidth={px(2.5)}
+                  style={{ cursor: 'move' }}
+                  onPointerDown={(e) =>
+                    beginElementDrag(e, { kind: 'wallEnd', id: selWall.id, end, joined: findJoined(floor, selWall[end]) })
+                  }
+                />
+              ))}
+              {wallLabel(selWall, 'var(--accent)')}
+            </>
+          )}
+
+          {/* Wandentwurf */}
+          {tool === 'wall' && draft && snapPreview && (
+            <g style={{ pointerEvents: 'none' }}>
+              <line
+                x1={draft.last.x}
+                y1={draft.last.y}
+                x2={snapPreview.x}
+                y2={snapPreview.y}
+                stroke="var(--accent)"
+                strokeWidth={opts.wallKind === 'outer' ? settings.outerThickness : settings.innerThickness}
+                strokeLinecap="square"
+                opacity={0.45}
+              />
+              {label(
+                formatLen(dist(draft.last, snapPreview), unit),
+                (draft.last.x + snapPreview.x) / 2,
+                (draft.last.y + snapPreview.y) / 2 - px(20),
+                0,
+                'var(--accent)',
+              )}
+            </g>
+          )}
+          {tool === 'wall' && snapPreview && <circle cx={snapPreview.x} cy={snapPreview.y} r={px(5)} fill="var(--accent)" style={{ pointerEvents: 'none' }} />}
+
+          {/* Platzierungs-Vorschau */}
+          {ghost && tool === 'opening' && (() => {
+            const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+            const L = wallLength(ghost.wall)
+            const width = Math.min(def.width, L)
+            const off = clamp(ghost.t - width / 2, 0, L - width)
+            return (
+              <g transform={`translate(${ghost.wall.a.x} ${ghost.wall.a.y}) rotate(${wallAngleDeg(ghost.wall)})`} style={{ pointerEvents: 'none' }}>
+                <rect x={off} y={-ghost.wall.thickness / 2 - 2} width={width} height={ghost.wall.thickness + 4} fill="var(--accent)" opacity={0.35} />
+              </g>
+            )
+          })()}
+          {ghost && tool === 'device' && (() => {
+            const dt = deviceType(opts.deviceTypeId)
+            const side = ghost.signed >= 0 ? 1 : -1
+            const pos = pointOnWall(ghost.wall, ghost.t, side, ghost.wall.thickness / 2)
+            const r = Math.max(65, px(7.5))
+            return (
+              <g transform={`translate(${pos.x} ${pos.y})`} opacity={0.6} style={{ pointerEvents: 'none' }}>
+                {shape(dt.category, r, dt.color, false)}
+              </g>
+            )
+          })()}
+
+          {/* Leitungsentwurf */}
+          {tool === 'cable' && cableDraft.length > 0 && (
+            <g style={{ pointerEvents: 'none' }}>
+              <polyline
+                points={[...cableDraft.map((p) => `${p.x},${p.y}`), ...(cursor ? [`${snap(cursor, cableDraft[cableDraft.length - 1], opts.ortho, true).p.x},${snap(cursor, cableDraft[cableDraft.length - 1], opts.ortho, true).p.y}`] : [])].join(' ')}
+                fill="none"
+                stroke={cableType(opts.cableTypeId).color}
+                strokeWidth={3}
+                strokeDasharray="6 4"
+                vectorEffect="non-scaling-stroke"
+              />
+              {cableDraft.map((n, i) => (
+                <g key={i}>
+                  <circle cx={n.x} cy={n.y} r={px(4.5)} fill={cableType(opts.cableTypeId).color} />
+                  {label(formatLen(n.z, unit, false), n.x + px(14), n.y - px(12), 0, cableType(opts.cableTypeId).color)}
+                </g>
+              ))}
+            </g>
+          )}
+
+          {/* Kalibrierung */}
+          {tool === 'calibrate' && calib.a && (
+            <g style={{ pointerEvents: 'none' }}>
+              <circle cx={calib.a.x} cy={calib.a.y} r={px(5)} fill="var(--accent)" />
+              {(() => {
+                const b = calib.b ?? cursor
+                if (!b) return null
+                return (
+                  <>
+                    <line x1={calib.a.x} y1={calib.a.y} x2={b.x} y2={b.y} stroke="var(--accent)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+                    <circle cx={b.x} cy={b.y} r={px(5)} fill="var(--accent)" />
+                    {label(formatLen(dist(calib.a, b), unit), (calib.a.x + b.x) / 2, (calib.a.y + b.y) / 2 - px(16), 0, 'var(--accent)')}
+                  </>
+                )
+              })()}
+            </g>
+          )}
+        </g>
+      </svg>
+
+      <ToolOptionsBar
+        cableNodes={cableDraft.length}
+        onVertical={addVertical}
+        onFinishCable={finishCable}
+        onCancelCable={() => setCableDraft([])}
+      />
+
+      <div className="zoom glass" onPointerDown={(e) => e.stopPropagation()}>
+        <button className="icon-btn" title="Verkleinern" onClick={() => zoomBy(1 / 1.3)}>
+          <Minus size={16} />
+        </button>
+        <button className="icon-btn" title="Vergrößern" onClick={() => zoomBy(1.3)}>
+          <Plus size={16} />
+        </button>
+        <button className="icon-btn" title="Einpassen (F)" onClick={fit}>
+          <Maximize size={16} />
+        </button>
+      </div>
+
+      <div className="status">
+        <span className="hint-text">{HINTS[tool]}</span>
+        {cursor && (
+          <span className="coords">
+            x {formatLen(cursor.x, unit)} · y {formatLen(cursor.y, unit)}
+          </span>
+        )}
+      </div>
+
+      {calib.a && calib.b && (
+        <Modal
+          title="Maßstab kalibrieren"
+          width={420}
+          onClose={() => setCalib({})}
+          footer={
+            <>
+              <button className="btn" onClick={() => setCalib({})}>
+                Abbrechen
+              </button>
+              <button className="btn primary" disabled={calibReal <= 0} onClick={applyCalibration}>
+                Maßstab setzen
+              </button>
+            </>
+          }
+        >
+          <p className="muted">
+            Gemessen im Plan: <b>{formatLen(calibMeasured, unit)}</b>. Wie lang ist die Strecke in Wirklichkeit?
+          </p>
+          <div className="row-ctl wide">
+            <LenField mm={calibReal} min={1} onCommit={setCalibReal} />
+          </div>
+          {floor.walls.length > 0 && (
+            <p className="warn">Bereits gezeichnete Wände werden nicht mitskaliert. Besser zuerst kalibrieren, dann zeichnen.</p>
+          )}
+        </Modal>
+      )}
+    </div>
+  )
+}

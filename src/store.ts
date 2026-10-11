@@ -15,6 +15,16 @@ import * as storage from './lib/storage'
 export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'calibrate'
 export type ViewMode = 'split' | '2d' | '3d'
 
+export interface AskDialog {
+  title: string
+  message?: string
+  /** Wenn gesetzt, wird ein Textfeld mit diesem Startwert angezeigt. */
+  initial?: string
+  okLabel?: string
+  danger?: boolean
+  onOk: (value: string) => void
+}
+
 export interface Selection {
   kind: 'wall' | 'opening' | 'device' | 'cable'
   id: string
@@ -46,6 +56,7 @@ interface State {
   toast: string | null
   importFile: File | null
   settingsOpen: boolean
+  ask: AskDialog | null
   past: Project[]
   future: Project[]
   lastEdit: { key: string; t: number } | null
@@ -65,6 +76,7 @@ interface State {
   showToast: (msg: string) => void
   openImport: (f: File | null) => void
   setSettingsOpen: (v: boolean) => void
+  setAsk: (a: AskDialog | null) => void
 
   openProject: (id: string) => Promise<void>
   createProject: (name: string) => Promise<void>
@@ -110,6 +122,7 @@ export const useStore = create<State>((set, get) => ({
   toast: null,
   importFile: null,
   settingsOpen: false,
+  ask: null,
   past: [],
   future: [],
   lastEdit: null,
@@ -174,6 +187,7 @@ export const useStore = create<State>((set, get) => ({
   toggleGhostWalls: () => set((s) => ({ ghostWalls: !s.ghostWalls })),
   openImport: (importFile) => set({ importFile }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setAsk: (ask) => set({ ask }),
 
   showToast: (msg) => {
     set({ toast: msg })

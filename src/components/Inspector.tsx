@@ -413,6 +413,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
   const openImport = useStore((s) => s.openImport)
   const clearBackground = useStore((s) => s.clearBackground)
   const removeFloor = useStore((s) => s.removeFloor)
+  const setAsk = useStore((s) => s.setAsk)
   const unit = useStore((s) => s.unit)
   const upd = (fn: (f: Floor) => void, key?: string) =>
     edit((p) => {
@@ -505,7 +506,15 @@ function FloorPanel({ floor }: { floor: Floor }) {
 
       {project.floors.length > 1 && (
         <div className="section">
-          <button className="btn danger block" onClick={() => confirm(`Geschoss „${floor.name}“ löschen?`) && removeFloor(floor.id)}>
+          <button className="btn danger block" onClick={() =>
+              setAsk({
+                title: 'Geschoss löschen?',
+                message: `„${floor.name}“ mit allen Wänden, Geräten und Leitungen wird gelöscht.`,
+                okLabel: 'Löschen',
+                danger: true,
+                onOk: () => removeFloor(floor.id),
+              })
+            }>
             <Trash2 size={15} /> Geschoss löschen
           </button>
         </div>

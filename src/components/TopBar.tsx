@@ -16,6 +16,7 @@ function ProjectMenu() {
   const importProjectText = useStore((s) => s.importProjectText)
   const edit = useStore((s) => s.edit)
   const showToast = useStore((s) => s.showToast)
+  const setAsk = useStore((s) => s.setAsk)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -55,7 +56,14 @@ function ProjectMenu() {
                 className="icon-btn"
                 title="Projekt löschen"
                 onClick={() => {
-                  if (confirm(`Projekt „${m.name}“ endgültig löschen?`)) void removeProject(m.id)
+                  setOpen(false)
+                  setAsk({
+                    title: 'Projekt löschen?',
+                    message: `„${m.name}“ wird endgültig gelöscht, inklusive Grundrissen.`,
+                    okLabel: 'Löschen',
+                    danger: true,
+                    onOk: () => void removeProject(m.id),
+                  })
                 }}
               >
                 <Trash2 size={14} />
@@ -66,9 +74,13 @@ function ProjectMenu() {
           <button
             className="menu-action"
             onClick={() => {
-              const name = prompt('Name des neuen Projekts', 'Neues Projekt')
-              if (name !== null) void createProject(name.trim())
               setOpen(false)
+              setAsk({
+                title: 'Neues Projekt',
+                initial: 'Neues Projekt',
+                okLabel: 'Anlegen',
+                onOk: (name) => void createProject(name),
+              })
             }}
           >
             <Plus size={15} /> Neues Projekt …
@@ -76,9 +88,13 @@ function ProjectMenu() {
           <button
             className="menu-action"
             onClick={() => {
-              const name = prompt('Projekt umbenennen', project.name)
-              if (name && name.trim()) edit((p) => void (p.name = name.trim()))
               setOpen(false)
+              setAsk({
+                title: 'Projekt umbenennen',
+                initial: project.name,
+                okLabel: 'Umbenennen',
+                onOk: (name) => name && edit((p) => void (p.name = name)),
+              })
             }}
           >
             <Pencil size={15} /> Umbenennen …

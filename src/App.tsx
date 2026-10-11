@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
+import AskDialog from './components/AskDialog'
 import Editor2D from './components/Editor2D'
 import ImportDialog from './components/ImportDialog'
 import Inspector from './components/Inspector'
@@ -78,6 +79,7 @@ export default function App() {
       </div>
       <ImportDialog />
       <SettingsDialog />
+      <AskDialog />
       <Toast />
     </div>
   )

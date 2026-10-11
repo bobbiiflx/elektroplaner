@@ -1,7 +1,6 @@
 {
  "used": {
   "sd-1.png": "c01",
-  "sd-2.png": "b10",
   "sd-3.png": "a15",
   "sw-1.png": "c03",
   "sw-jal.png": "c11",
@@ -12,8 +11,13 @@
   "uv.png": "b01",
   "nym-3adrig.png": "c05",
   "nym-5adrig.png": "c06",
-  "cat-kabel.png": "c07",
-  "rohr-flex.png": "b05"
+  "rohr-flex.png": "b05",
+  "sd-2.png": "d01 (4. Blatt)",
+  "eth-2.png": "d03 (4. Blatt)",
+  "sw-2.png": "d04 (4. Blatt)",
+  "knx-4.png": "d02 (4. Blatt)",
+  "cat-kabel.png": "d05 (4. Blatt)",
+  "knx-bus.png": "d06 (4. Blatt)"
  },
  "unused": {
   "steckdose-1fach-foto.png": "steckdose-1fach-foto (Duplikat zu sd-1)",
@@ -48,6 +52,17 @@
   "ueberwachungskamera.png": "ueberwachungskamera",
   "funk-lesegeraet-schwarz.png": "funk-lesegeraet-schwarz",
   "ls-schalter-2polig.png": "ls-schalter-2polig",
-  "kleinverteiler-aufputz.png": "kleinverteiler-aufputz (Duplikat zu b01)"
+  "kleinverteiler-aufputz.png": "kleinverteiler-aufputz (Duplikat zu b01)",
+  "steckdose-2fach-senkrecht-icon.png": "frühere Wahl für sd-2 (senkrecht)",
+  "cat-kabel-gruen.png": "früheres Cat-Kabel (grün)",
+  "steckdosenleiste-3fach-iec.png": "4. Blatt d07",
+  "verbindungsklemme-2fach.png": "4. Blatt d08",
+  "abzweigdose-orange-aufputz.png": "4. Blatt d09",
+  "unterputz-geraetedose-orange-v2.png": "4. Blatt d10",
+  "abzweigdose-grau-v2.png": "4. Blatt d11",
+  "ueberwachungskamera-v2.png": "4. Blatt d12",
+  "wanddisplay-v2.png": "4. Blatt d13",
+  "deckenmelder-praesenz.png": "4. Blatt d14",
+  "ls-schalter-2polig-v2.png": "4. Blatt d16"
  }
 }

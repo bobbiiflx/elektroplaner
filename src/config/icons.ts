@@ -5,6 +5,10 @@ import cat from '../assets/icons/cat-kabel.png'
 import disp from '../assets/icons/disp.png'
 import doseAb from '../assets/icons/dose-ab.png'
 import eth1 from '../assets/icons/eth-1.png'
+import eth2 from '../assets/icons/eth-2.png'
+import knx4 from '../assets/icons/knx-4.png'
+import knxBus from '../assets/icons/knx-bus.png'
+import sw2 from '../assets/icons/sw-2.png'
 import knxTs from '../assets/icons/knx-ts.png'
 import nym3 from '../assets/icons/nym-3adrig.png'
 import nym5 from '../assets/icons/nym-5adrig.png'
@@ -24,6 +28,9 @@ export const DEVICE_IMG: Record<string, string> = {
   'sw-w': sw1, // Wechselschalter sieht von vorn aus wie der Ausschalter
   'sw-jal': swJal,
   'eth-1': eth1,
+  'eth-2': eth2,
+  'knx-4': knx4,
+  'sw-2': sw2,
   'knx-ts': knxTs,
   disp,
   'dose-ab': doseAb,
@@ -39,5 +46,6 @@ export const CABLE_IMG: Record<string, string> = {
   'nym-5x6': nym5,
   'nym-5x10': nym5,
   cat7: cat,
+  knx: knxBus,
   'rohr-m25': rohr,
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { produce, type Draft } from 'immer'
 import type {
   Background,
+  CableNode,
   Floor,
   OpeningType,
   Project,
@@ -10,6 +11,8 @@ import type {
   WallKind,
 } from './types'
 import { newFloor, newProject, sampleProject } from './lib/factory'
+import { cableType } from './config/catalog'
+import { uid } from './lib/geom'
 import * as storage from './lib/storage'
 
 export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'calibrate'
@@ -57,6 +60,11 @@ interface State {
   importFile: File | null
   settingsOpen: boolean
   ask: AskDialog | null
+  pickerOpen: boolean
+  /** Linke Fläche: Grundriss oder Frontansicht einer Wand */
+  planPane: 'plan' | 'wall'
+  elevWallId: string | null
+  elevSide: 1 | -1
   past: Project[]
   future: Project[]
   lastEdit: { key: string; t: number } | null
@@ -77,6 +85,12 @@ interface State {
   openImport: (f: File | null) => void
   setSettingsOpen: (v: boolean) => void
   setAsk: (a: AskDialog | null) => void
+  setPickerOpen: (v: boolean) => void
+  openElevation: (wallId: string) => void
+  closeElevation: () => void
+  setElevSide: (s: 1 | -1) => void
+  /** Legt aus den Knoten eine Leitung im aktiven Geschoss an (Typ aus den Werkzeugoptionen) und wählt sie. */
+  createCable: (points: CableNode[]) => void
 
   openProject: (id: string) => Promise<void>
   createProject: (name: string) => Promise<void>
@@ -123,6 +137,10 @@ export const useStore = create<State>((set, get) => ({
   importFile: null,
   settingsOpen: false,
   ask: null,
+  pickerOpen: false,
+  planPane: 'plan',
+  elevWallId: null,
+  elevSide: 1,
   past: [],
   future: [],
   lastEdit: null,
@@ -177,7 +195,7 @@ export const useStore = create<State>((set, get) => ({
     fixSelection()
   },
 
-  setTool: (t) => set({ tool: t }),
+  setTool: (t) => set((st) => ({ tool: t, pickerOpen: t === 'device' ? (st.tool !== 'device' ? true : st.pickerOpen) : false })),
   select: (selection) => set({ selection }),
   setOpts: (o) => set((s) => ({ opts: { ...s.opts, ...o } })),
   setUnit: (unit) => set({ unit }),
@@ -188,6 +206,21 @@ export const useStore = create<State>((set, get) => ({
   openImport: (importFile) => set({ importFile }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setAsk: (ask) => set({ ask }),
+  setPickerOpen: (pickerOpen) => set({ pickerOpen }),
+  openElevation: (wallId) => set({ planPane: 'wall', elevWallId: wallId, pickerOpen: false }),
+  closeElevation: () => set({ planPane: 'plan', pickerOpen: false }),
+  setElevSide: (elevSide) => set({ elevSide }),
+  createCable: (points) => {
+    if (points.length < 2) return
+    const { opts, activeFloorId } = get()
+    const ct = cableType(opts.cableTypeId)
+    const id = uid('c_')
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === activeFloorId)
+      f?.cables.push({ id, typeId: ct.id, points, fuseA: ct.defaultFuse ?? 16, method: 'B2', charac: 'B' })
+    })
+    set({ selection: { kind: 'cable', id } })
+  },
 
   showToast: (msg) => {
     set({ toast: msg })
@@ -214,6 +247,9 @@ export const useStore = create<State>((set, get) => ({
       activeFloorId: p.floors[0].id,
       selection: null,
       tool: 'select',
+      planPane: 'plan',
+      elevWallId: null,
+      pickerOpen: false,
       past: [],
       future: [],
       lastEdit: null,
@@ -252,7 +288,7 @@ export const useStore = create<State>((set, get) => ({
     await get().openProject(p.id)
   },
 
-  setActiveFloor: (id) => set({ activeFloorId: id, selection: null }),
+  setActiveFloor: (id) => set({ activeFloorId: id, selection: null, planPane: 'plan', elevWallId: null }),
 
   addFloor: () => {
     const { project } = get()

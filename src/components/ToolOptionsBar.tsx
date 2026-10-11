@@ -1,6 +1,7 @@
-import { CABLE_TYPES, CATEGORY_LABEL, DEVICE_TYPES, type DeviceCategory } from '../config/catalog'
+import { CABLE_TYPES } from '../config/catalog'
 import { useStore } from '../store'
 import { LenField } from './NumberField'
+import { DevicePicker, DevicePickerButton } from './DevicePicker'
 import { Segmented } from './ui'
 
 interface Props {
@@ -8,12 +9,15 @@ interface Props {
   onVertical: () => void
   onFinishCable: () => void
   onCancelCable: () => void
+  /** 'wall' = Wandansicht: Höhe ergibt sich aus dem Klick, kein „Senkrecht“-Knopf nötig. */
+  mode?: 'plan' | 'wall'
 }
 
-export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancelCable }: Props) {
+export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancelCable, mode = 'plan' }: Props) {
   const tool = useStore((s) => s.tool)
   const opts = useStore((s) => s.opts)
   const setOpts = useStore((s) => s.setOpts)
+  const pickerOpen = useStore((s) => s.pickerOpen)
   const hasBg = useStore((s) => {
     const f = s.project.floors.find((x) => x.id === s.activeFloorId) ?? s.project.floors[0]
     return !!f.background
@@ -21,12 +25,8 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
 
   if (tool === 'select') return null
 
-  const groups = (Object.keys(CATEGORY_LABEL) as DeviceCategory[]).map((c) => ({
-    cat: c,
-    items: DEVICE_TYPES.filter((d) => d.category === c),
-  }))
-
   return (
+    <>
     <div className="optbar glass" onPointerDown={(e) => e.stopPropagation()}>
       {tool === 'wall' && (
         <>
@@ -56,19 +56,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         />
       )}
 
-      {tool === 'device' && (
-        <select value={opts.deviceTypeId} onChange={(e) => setOpts({ deviceTypeId: e.target.value })}>
-          {groups.map((g) => (
-            <optgroup key={g.cat} label={CATEGORY_LABEL[g.cat]}>
-              {g.items.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      )}
+      {tool === 'device' && <DevicePickerButton />}
 
       {tool === 'cable' && (
         <>
@@ -79,13 +67,17 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
               </option>
             ))}
           </select>
-          <span className="opt-label">Höhe</span>
-          <div className="opt-field">
-            <LenField mm={opts.cableZ} onCommit={(v) => setOpts({ cableZ: v })} />
-          </div>
-          <button className="btn small" disabled={cableNodes < 1} onClick={onVertical} title="Neue Höhe eintragen, dann hier klicken: Leitung geht an derselben Stelle senkrecht auf diese Höhe">
-            Senkrecht
-          </button>
+          {mode === 'plan' && (
+            <>
+              <span className="opt-label">Höhe</span>
+              <div className="opt-field">
+                <LenField mm={opts.cableZ} onCommit={(v) => setOpts({ cableZ: v })} />
+              </div>
+              <button className="btn small" disabled={cableNodes < 1} onClick={onVertical} title="Neue Höhe eintragen, dann hier klicken: Leitung geht an derselben Stelle senkrecht auf diese Höhe">
+                Senkrecht
+              </button>
+            </>
+          )}
           <button className="btn small primary" disabled={cableNodes < 2} onClick={onFinishCable}>
             Fertig
           </button>
@@ -103,5 +95,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         </span>
       )}
     </div>
+    {tool === 'device' && pickerOpen && <DevicePicker />}
+    </>
   )
 }

@@ -6,6 +6,7 @@ import Inspector from './components/Inspector'
 import SettingsDialog from './components/SettingsDialog'
 import ToolRail, { TOOLS } from './components/ToolRail'
 import TopBar from './components/TopBar'
+import WallElevation from './components/WallElevation'
 import { useStore } from './store'
 
 const View3D = lazy(() => import('./components/View3D'))
@@ -19,6 +20,7 @@ function Toast() {
 export default function App() {
   const ready = useStore((s) => s.ready)
   const viewMode = useStore((s) => s.viewMode)
+  const planPane = useStore((s) => s.planPane)
 
   useEffect(() => {
     void useStore.getState().init()
@@ -43,6 +45,19 @@ export default function App() {
           e.preventDefault()
           st.deleteSelection()
         }
+      } else if (!mod && !e.altKey && e.key.toLowerCase() === 'e') {
+        const sel = st.selection
+        const fl = st.project.floors.find((f) => f.id === st.activeFloorId) ?? st.project.floors[0]
+        const wid =
+          sel?.kind === 'wall'
+            ? sel.id
+            : sel?.kind === 'opening'
+              ? fl.openings.find((o) => o.id === sel.id)?.wallId
+              : sel?.kind === 'device'
+                ? fl.devices.find((d) => d.id === sel.id)?.wallId
+                : (st.elevWallId ?? fl.walls[0]?.id)
+        if (st.planPane === 'wall') st.closeElevation()
+        else if (wid) st.openElevation(wid)
       } else if (!mod && !e.altKey) {
         const t = TOOLS.find((x) => x.key.toLowerCase() === e.key.toLowerCase())
         if (t) st.setTool(t.id)
@@ -61,7 +76,11 @@ export default function App() {
         <div className="panes">
           {viewMode !== '3d' && (
             <div className="pane">
-              <Editor2D />
+              {/* Der Grundriss bleibt eingehängt (Ansicht & Zustand bleiben erhalten), solange die Wandansicht offen ist */}
+              <div style={{ display: planPane === 'plan' ? 'contents' : 'none' }}>
+                <Editor2D />
+              </div>
+              {planPane === 'wall' && <WallElevation />}
               <ToolRail />
             </div>
           )}

@@ -14,13 +14,18 @@ Noch offen: Bemaßungen (Etappe 4), Druckansichten mit Checklisten (Etappe 5), M
 3. **Wände nachzeichnen** (*W*): Klicken setzt Punkte, Doppelklick/Enter/Rechtsklick beendet. Es rastet an Ecken, Wänden und Raster ein.
    *Shift* schaltet „rechtwinklig“ um. Griffe an gewählten Wänden verschieben die Ecken (verbundene Wände folgen).
 4. **Tür/Fenster** (*O*) und **Geräte** (*D*: Steckdosen, Schalter, Ethernet, KNX, Wanddisplay, Dosen) auf Wände klicken, danach ziehen oder rechts im Inspector Maße eintippen.
-5. **Leitungen** (*C*): Typ und Höhe wählen, Punkte klicken. Auf ein Gerät klicken verbindet die Leitung damit.
-   Für senkrechte Abschnitte neue Höhe eintragen und *Senkrecht* drücken. Leitungen sind in 3D immer sichtbar.
-6. Im Inspector erscheinen **VDE-Prüfung** (Belastbarkeit, Spannungsfall, Abschaltbedingung, maximale Länge) und **Zonenprüfung**.
+5. **Leitungen** (*C*): Typ und Höhe wählen, Punkte klicken. Leitungen laufen immer nur **waagerecht oder senkrecht** – bei Bedarf
+   setzt die App automatisch einen rechtwinkligen Knick. Dosen und Schalter rasten ein (Mitte); die Leitung führt von oben/unten hinein.
+   Für senkrechte Abschnitte im Grundriss neue Höhe eintragen und *Senkrecht* drücken. Leitungen sind in 3D immer sichtbar.
+6. **Wandansicht** (*E*, Umschalter links oben, Doppelklick auf eine Wand oder Button im Inspector): Frontansicht der gewählten Wand
+   mit Zonen, Öffnungen, Geräten (als Frontplatten) und Leitungen. Geräte setzen, ziehen und Leitungen einzeichnen – mit Einrasten an
+   Zonenmitten, Fluchten anderer Geräte und Öffnungskanten sowie Maßen zu OKFF und Wandenden.
+7. **Geräteauswahl** (*D*): Maske mit Icon (Frontplatte) und Planzeichen, nach Kategorien gefiltert und durchsuchbar.
+8. Im Inspector erscheinen **VDE-Prüfung** (Belastbarkeit, Spannungsfall, Abschaltbedingung, maximale Länge) und **Zonenprüfung**.
 
 Alle Maße sind intern in Millimetern, die Anzeige lässt sich oben auf mm / cm / m umstellen.
 
-Tastenkürzel: V Auswählen · W Wand · O Tür/Fenster · D Gerät · C Leitung · K Kalibrieren · F Einpassen · ⌘/Strg+Z Rückgängig · ⇧⌘Z Wiederholen · Entf Löschen · Leertaste+Ziehen Ansicht verschieben.
+Tastenkürzel: V Auswählen · W Wand · O Tür/Fenster · D Gerät · C Leitung · K Kalibrieren · E Wandansicht · F Einpassen · ⌘/Strg+Z Rückgängig · ⇧⌘Z Wiederholen · Entf Löschen · Leertaste+Ziehen Ansicht verschieben.
 
 ## Normwerte anpassen
 

@@ -17,6 +17,7 @@
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   --radius: 12px;
   --field: rgba(0, 0, 0, 0.05);
+  --plate: #fbfbfd;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   color: var(--ink);
@@ -43,6 +44,7 @@
     --warn: #ff9f0a;
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     --field: rgba(255, 255, 255, 0.09);
+    --plate: #3a3a3c;
   }
 }
 
@@ -445,7 +447,7 @@ svg.plan {
 
 .optbar {
   position: absolute;
-  top: 12px;
+  top: 62px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -795,4 +797,191 @@ p {
   .topbar {
     overflow-x: auto;
   }
+}
+
+/* --- Geräte-Auswahlmaske ------------------------------------------------ */
+.picker-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+.picker {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 140px));
+  max-height: calc(100% - 170px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  z-index: 6;
+  overflow: hidden;
+}
+.picker-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 8px;
+}
+.picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--field);
+  color: var(--ink-soft);
+}
+.picker-search input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  min-width: 0;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chip {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 12.5px;
+  background: var(--field);
+  color: var(--ink);
+}
+.chip.on {
+  background: var(--accent);
+  color: #fff;
+}
+.picker-body {
+  overflow: auto;
+  padding: 4px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.picker-body h4 {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.dev-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 9px;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  background: var(--field);
+  color: var(--ink);
+  text-align: center;
+}
+.dev-card:hover {
+  background: var(--accent-soft);
+}
+.dev-card.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dev-icon {
+  height: 68px;
+  display: grid;
+  place-items: center;
+}
+.dev-sym {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  opacity: 0.95;
+}
+.dev-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.dev-meta {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.picker-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 14px 9px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--line);
+}
+.picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.picker-btn.on {
+  background: var(--accent-soft);
+}
+.picker-btn-name {
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paneswitch {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+}
+.wall-select {
+  height: 28px;
+  max-width: 170px;
+}
+.wallbar {
+  position: absolute;
+  left: 84px;
+  bottom: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  z-index: 6;
+  max-width: calc(100% - 160px);
+  flex-wrap: wrap;
 }

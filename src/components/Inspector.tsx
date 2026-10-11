@@ -69,6 +69,7 @@ function useEditFloor() {
 function WallPanel({ wall, floor }: { wall: Wall; floor: Floor }) {
   const editFloor = useEditFloor()
   const settings = useStore((s) => s.project.settings)
+  const openElevation = useStore((s) => s.openElevation)
   const L = wallLength(wall)
   const upd = (fn: (w: Wall) => void, key?: string) =>
     editFloor((f) => {
@@ -115,6 +116,9 @@ function WallPanel({ wall, floor }: { wall: Wall; floor: Floor }) {
         <p className="muted">
           {nOpen} {nOpen === 1 ? 'Öffnung' : 'Öffnungen'} · {nDev} {nDev === 1 ? 'Gerät' : 'Geräte'}
         </p>
+        <button className="btn small" onClick={() => openElevation(wall.id)} title="Frontansicht dieser Wand zum Einzeichnen (E)">
+          Wandansicht öffnen
+        </button>
       </Section>
     </>
   )

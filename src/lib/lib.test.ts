@@ -4,6 +4,7 @@ import { cableLengths, nearestWall, pointOnWall, wallLength } from './geom'
 import { sampleProject, elevationOf } from './factory'
 import { formatLen, fromDisplay, parseNum, toDisplay } from './units'
 import { ampacityOf, evaluate, voltageDropPct } from './vde'
+import { isOrthogonal, routeTo } from './cableRoute'
 import { checkCable, checkDevice, horizontalBands, verticalSpans } from './zones'
 
 describe('units', () => {
@@ -100,5 +101,41 @@ describe('Installationszonen', () => {
     }
     const issues = checkCable(bad, f, z, 2500)
     expect(issues.length).toBe(2)
+  })
+})
+
+describe('Leitungsführung (nur waagerecht/senkrecht)', () => {
+  const walls = [{ id: 'w', a: { x: 0, y: 0 }, b: { x: 4000, y: 0 }, thickness: 240, kind: 'outer' as const }]
+  const start = { x: 1000, y: 0, z: 300 }
+
+  it('erzeugt bei Versatz in Höhe und Länge Knick + Steigleitung', () => {
+    const target = { x: 2500, y: 0, z: 1050, deviceId: 'd1' }
+    const nodes = routeTo(start, target, walls)
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]).toMatchObject({ x: 2500, y: 0, z: 300 })
+    expect(nodes[1]).toMatchObject({ x: 2500, z: 1050, deviceId: 'd1' })
+    expect(isOrthogonal([start, ...nodes], walls)).toBe(true)
+  })
+
+  it('setzt bei schrägen Zielen im Grundriss einen rechtwinkligen Knick', () => {
+    const target = { x: 2000, y: 1500, z: 300 }
+    const nodes = routeTo(start, target, walls)
+    expect(nodes).toHaveLength(2)
+    expect(isOrthogonal([start, ...nodes], walls)).toBe(true)
+    expect(nodes[nodes.length - 1]).toMatchObject({ x: 2000, y: 1500, z: 300 })
+  })
+
+  it('braucht bei reinem Höhenwechsel nur einen Knoten', () => {
+    expect(routeTo(start, { x: 1000, y: 0, z: 2300 }, walls)).toHaveLength(1)
+  })
+
+  it('liefert nichts, wenn das Ziel schon erreicht ist', () => {
+    expect(routeTo(start, { ...start }, walls)).toHaveLength(0)
+  })
+
+  it('lässt Abschnitte parallel zu schrägen Wänden zu', () => {
+    const diag = [{ id: 'd', a: { x: 0, y: 0 }, b: { x: 3000, y: 3000 }, thickness: 240, kind: 'inner' as const }]
+    const nodes = routeTo({ x: 500, y: 500, z: 300 }, { x: 2000, y: 2000, z: 300 }, diag)
+    expect(nodes).toHaveLength(1)
   })
 })

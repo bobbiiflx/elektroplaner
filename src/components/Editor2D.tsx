@@ -18,6 +18,9 @@ import {
 import { findJoined, moveEnds, syncDeviceNodes, type WallEnd } from '../lib/link'
 import { formatLen } from '../lib/units'
 import { LenField } from './NumberField'
+import { routeTo } from '../lib/cableRoute'
+import { PlanSymbolShape } from './DeviceIcons'
+import { PaneSwitch } from './PaneSwitch'
 import { ToolOptionsBar } from './ToolOptionsBar'
 import { Modal } from './ui'
 
@@ -42,7 +45,7 @@ const HINTS: Record<string, string> = {
   wall: 'Klicken setzt Punkte · Doppelklick, Enter oder Rechtsklick beendet · Shift schaltet „rechtwinklig“ um',
   opening: 'Auf eine Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
   device: 'Auf eine Wand klicken, um das Gerät zu setzen',
-  cable: 'Klicken setzt Leitungspunkte (Höhe oben einstellen) · Enter beendet · Gerät anklicken verbindet',
+  cable: 'Leitungen laufen nur waagerecht/senkrecht · Dose oder Schalter anklicken verbindet · Enter beendet · Detailarbeit in der Wandansicht (E)',
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
 }
 
@@ -58,6 +61,9 @@ export default function Editor2D() {
   const select = useStore((s) => s.select)
   const setTool = useStore((s) => s.setTool)
   const showToast = useStore((s) => s.showToast)
+  const createCable = useStore((s) => s.createCable)
+  const planPane = useStore((s) => s.planPane)
+  const openElevation = useStore((s) => s.openElevation)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -172,26 +178,9 @@ export default function Editor2D() {
   }, [])
 
   const finishCable = useCallback(() => {
-    if (cableDraft.length < 2) {
-      setCableDraft([])
-      return
-    }
-    const ct = cableType(opts.cableTypeId)
-    const id = uid('c_')
-    edit((p) => {
-      const f = p.floors.find((x) => x.id === floor.id)
-      f?.cables.push({
-        id,
-        typeId: ct.id,
-        points: cableDraft,
-        fuseA: ct.defaultFuse ?? 16,
-        method: 'B2',
-        charac: 'B',
-      })
-    })
+    if (cableDraft.length >= 2) createCable(cableDraft)
     setCableDraft([])
-    select({ kind: 'cable', id })
-  }, [cableDraft, opts.cableTypeId, edit, floor.id, select])
+  }, [cableDraft, createCable])
 
   useEffect(() => {
     const isTyping = (t: EventTarget | null) => {
@@ -200,11 +189,14 @@ export default function Editor2D() {
     }
     const down = (e: KeyboardEvent) => {
       if (isTyping(e.target)) return
+      if ((wrapRef.current?.clientWidth ?? 0) === 0) return // Wandansicht ist aktiv
       if (e.code === 'Space') {
         spaceRef.current = true
         e.preventDefault()
       } else if (e.key === 'Escape') {
-        if (draft || cableDraft.length || calib.a) cancelDrafts()
+        const st = useStore.getState()
+        if (st.pickerOpen) st.setPickerOpen(false)
+        else if (draft || cableDraft.length || calib.a) cancelDrafts()
         else setTool('select')
       } else if (e.key === 'Enter') {
         if (tool === 'cable') finishCable()
@@ -226,7 +218,7 @@ export default function Editor2D() {
 
   useEffect(() => {
     cancelDrafts()
-  }, [tool, floor.id, cancelDrafts])
+  }, [tool, floor.id, planPane, cancelDrafts])
 
   // --- Einrasten -----------------------------------------------------------
   const snap = (
@@ -362,28 +354,34 @@ export default function Editor2D() {
     select({ kind: 'device', id })
   }
 
-  const addCableNode = (raw: Vec2, orthoNow: boolean) => {
-    // 1. Gerät einrasten
+  /**
+   * Ziel eines Leitungsklicks: Dose/Schalter (rastet an der Mitte ein) oder Punkt auf Wandlinie/Raster.
+   * Leitungen laufen immer nur waagerecht (achs- oder wandparallel) oder senkrecht – routeTo ergänzt Knicke.
+   */
+  const cableTarget = (raw: Vec2): { node: CableNode; deviceId?: string } => {
     const tol = 18 / s
+    let best: { id: string; d: number; pos: Vec2; z: number } | null = null
     for (const d of floor.devices) {
       const pos = devicePos(floor, d.id)
       if (!pos) continue
-      if (dist(pos.face, raw) <= tol || dist(pos.center, raw) <= tol) {
-        const node: CableNode = { x: pos.center.x, y: pos.center.y, z: d.height, deviceId: d.id }
-        pushNode(node)
-        return
-      }
+      const dd = Math.min(dist(pos.face, raw), dist(pos.center, raw))
+      if (dd <= tol && (!best || dd < best.d)) best = { id: d.id, d: dd, pos: pos.center, z: d.height }
     }
-    // 2. Wandmittellinie / Raster
+    if (best) return { node: { x: best.pos.x, y: best.pos.y, z: best.z, deviceId: best.id }, deviceId: best.id }
     const last = cableDraft[cableDraft.length - 1]
-    const { p } = snap(raw, last ? { x: last.x, y: last.y } : undefined, orthoNow, true)
-    pushNode({ x: p.x, y: p.y, z: opts.cableZ })
+    const { p } = snap(raw, last ? { x: last.x, y: last.y } : undefined, true, true)
+    return { node: { x: p.x, y: p.y, z: opts.cableZ } }
   }
 
-  const pushNode = (n: CableNode) => {
+  const addCableNode = (raw: Vec2) => {
+    const { node } = cableTarget(raw)
     const last = cableDraft[cableDraft.length - 1]
-    if (last && dist(last, n) < 1 && Math.abs(last.z - n.z) < 1) return
-    setCableDraft([...cableDraft, n])
+    if (!last) {
+      setCableDraft([node])
+      return
+    }
+    const more = routeTo(last, node, floor.walls)
+    if (more.length) setCableDraft([...cableDraft, ...more])
   }
 
   const addVertical = () => {
@@ -456,7 +454,7 @@ export default function Editor2D() {
         placeDevice(raw)
         break
       case 'cable':
-        addCableNode(raw, orthoNow)
+        addCableNode(raw)
         break
       case 'calibrate':
         addCalibPoint(raw)
@@ -529,7 +527,8 @@ export default function Editor2D() {
   }
 
   const onDoubleClick = () => {
-    if (tool === 'wall') setDraft(null)
+    if (tool === 'select' && selection?.kind === 'wall') openElevation(selection.id)
+    else if (tool === 'wall') setDraft(null)
     else if (tool === 'cable') finishCable()
   }
 
@@ -600,24 +599,9 @@ export default function Editor2D() {
     return label(formatLen(wallLength(w), unit), mid.x + n.x * off, mid.y + n.y * off, wallAngleDeg(w), color)
   }
 
-  const shape = (cat: DeviceCategory, r: number, fill: string, selected: boolean) => {
-    const stroke = selected ? 'var(--accent)' : 'var(--paper)'
-    const sw = selected ? px(2.5) : px(1.5)
-    switch (cat) {
-      case 'switch':
-        return <rect x={-r} y={-r} width={2 * r} height={2 * r} rx={r * 0.28} fill={fill} stroke={stroke} strokeWidth={sw} />
-      case 'data':
-        return <polygon points={`0,${-r * 1.15} ${r * 1.05},${r * 0.85} ${-r * 1.05},${r * 0.85}`} fill={fill} stroke={stroke} strokeWidth={sw} />
-      case 'knx':
-        return <polygon points={`0,${-r * 1.25} ${r * 1.25},0 0,${r * 1.25} ${-r * 1.25},0`} fill={fill} stroke={stroke} strokeWidth={sw} />
-      case 'display':
-        return <rect x={-r * 1.6} y={-r} width={r * 3.2} height={2 * r} rx={r * 0.25} fill={fill} stroke={stroke} strokeWidth={sw} />
-      case 'box':
-        return <rect x={-r * 0.8} y={-r * 0.8} width={r * 1.6} height={r * 1.6} fill="var(--paper)" stroke={fill} strokeWidth={px(2)} />
-      default:
-        return <circle r={r} fill={fill} stroke={stroke} strokeWidth={sw} />
-    }
-  }
+  const shape = (cat: DeviceCategory, r: number, fill: string, selected: boolean) => (
+    <PlanSymbolShape cat={cat} r={r} fill={fill} stroke={selected ? 'var(--accent)' : 'var(--paper)'} sw={selected ? px(2.5) : px(1.5)} />
+  )
 
   const selWall = selection?.kind === 'wall' ? floor.walls.find((w) => w.id === selection.id) : undefined
   const calibMeasured = calib.a && calib.b ? dist(calib.a, calib.b) : 0
@@ -836,22 +820,31 @@ export default function Editor2D() {
           })()}
 
           {/* Leitungsentwurf */}
-          {tool === 'cable' && cableDraft.length > 0 && (
+          {tool === 'cable' && cursor && (() => {
+            const col = cableType(opts.cableTypeId).color
+            const tgt = cableTarget(cursor)
+            const last = cableDraft[cableDraft.length - 1]
+            const ahead = last ? [last, ...routeTo(last, tgt.node, floor.walls)] : [tgt.node]
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                {cableDraft.length > 1 && (
+                  <polyline points={cableDraft.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={col} strokeWidth={3} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+                )}
+                <polyline points={ahead.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={col} strokeWidth={3} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" opacity={0.85} />
+                {cableDraft.map((n, i) => (
+                  <g key={i}>
+                    <circle cx={n.x} cy={n.y} r={px(4.5)} fill={col} />
+                    {label(formatLen(n.z, unit, false), n.x + px(14), n.y - px(12), 0, col)}
+                  </g>
+                ))}
+                <circle cx={tgt.node.x} cy={tgt.node.y} r={px(tgt.deviceId ? 12 : 6)} fill={tgt.deviceId ? 'none' : 'var(--accent)'} stroke="var(--accent)" strokeWidth={px(2.5)} />
+                {tgt.deviceId && label(`${deviceType(floor.devices.find((d) => d.id === tgt.deviceId)!.typeId).name} · ${formatLen(tgt.node.z, unit)}`, tgt.node.x, tgt.node.y - px(22), 0, 'var(--accent)')}
+              </g>
+            )
+          })()}
+          {tool === 'cable' && !cursor && cableDraft.length > 0 && (
             <g style={{ pointerEvents: 'none' }}>
-              <polyline
-                points={[...cableDraft.map((p) => `${p.x},${p.y}`), ...(cursor ? [`${snap(cursor, cableDraft[cableDraft.length - 1], opts.ortho, true).p.x},${snap(cursor, cableDraft[cableDraft.length - 1], opts.ortho, true).p.y}`] : [])].join(' ')}
-                fill="none"
-                stroke={cableType(opts.cableTypeId).color}
-                strokeWidth={3}
-                strokeDasharray="6 4"
-                vectorEffect="non-scaling-stroke"
-              />
-              {cableDraft.map((n, i) => (
-                <g key={i}>
-                  <circle cx={n.x} cy={n.y} r={px(4.5)} fill={cableType(opts.cableTypeId).color} />
-                  {label(formatLen(n.z, unit, false), n.x + px(14), n.y - px(12), 0, cableType(opts.cableTypeId).color)}
-                </g>
-              ))}
+              <polyline points={cableDraft.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={cableType(opts.cableTypeId).color} strokeWidth={3} vectorEffect="non-scaling-stroke" />
             </g>
           )}
 
@@ -874,6 +867,8 @@ export default function Editor2D() {
           )}
         </g>
       </svg>
+
+      <PaneSwitch />
 
       <ToolOptionsBar
         cableNodes={cableDraft.length}

@@ -985,3 +985,13 @@ p {
   max-width: calc(100% - 160px);
   flex-wrap: wrap;
 }
+.cable-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--paper);
+}
+.dev-icon img {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18));
+}

@@ -1,6 +1,6 @@
-import { CABLE_TYPES } from '../config/catalog'
 import { useStore } from '../store'
 import { LenField } from './NumberField'
+import { CablePicker, CablePickerButton } from './CablePicker'
 import { DevicePicker, DevicePickerButton } from './DevicePicker'
 import { Segmented } from './ui'
 
@@ -60,13 +60,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
 
       {tool === 'cable' && (
         <>
-          <select value={opts.cableTypeId} onChange={(e) => setOpts({ cableTypeId: e.target.value })}>
-            {CABLE_TYPES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <CablePickerButton />
           {mode === 'plan' && (
             <>
               <span className="opt-label">Höhe</span>
@@ -96,6 +90,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
       )}
     </div>
     {tool === 'device' && pickerOpen && <DevicePicker />}
+    {tool === 'cable' && pickerOpen && <CablePicker />}
     </>
   )
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { deviceType, type DeviceCategory, type DeviceType } from '../config/catalog'
+import { cableType, deviceType, type DeviceCategory, type DeviceType } from '../config/catalog'
+import { CABLE_IMG, DEVICE_IMG } from '../config/icons'
 
 // ---------------------------------------------------------------------------
 // Zwei Darstellungen je Gerät:
@@ -272,8 +273,10 @@ export function DeviceFace({ dt }: { dt: DeviceType }) {
   }
 }
 
-/** Icon (Frontplatte) als eigenständiges SVG, passt sich in ein Quadrat ein. */
+/** Icon eines Geräts: Produktbild, falls vorhanden, sonst gezeichnete Frontplatte. Passt sich in ein Quadrat ein. */
 export function DeviceIcon({ typeId, size = 56 }: { typeId: string; size?: number }) {
+  const img = DEVICE_IMG[typeId]
+  if (img) return <img src={img} width={size} height={size} alt="" draggable={false} style={{ objectFit: 'contain' }} />
   const dt = deviceType(typeId)
   const pad = 8
   const vw = dt.w + pad * 2
@@ -281,6 +284,19 @@ export function DeviceIcon({ typeId, size = 56 }: { typeId: string; size?: numbe
   return (
     <svg width={size} height={size} viewBox={`${-vw / 2} ${-vh / 2} ${vw} ${vh}`} aria-hidden style={{ overflow: 'visible' }}>
       <DeviceFace dt={dt} />
+    </svg>
+  )
+}
+
+/** Icon eines Leitungstyps: Produktbild oder ein farbiger Leitungsstrich als Ersatz. */
+export function CableIcon({ typeId, size = 56 }: { typeId: string; size?: number }) {
+  const img = CABLE_IMG[typeId]
+  if (img) return <img src={img} width={size} height={size} alt="" draggable={false} style={{ objectFit: 'contain' }} />
+  const ct = cableType(typeId)
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
+      <path d="M8 46 C 22 46, 22 18, 36 18 S 50 30, 56 18" fill="none" stroke={ct.color} strokeWidth={7} strokeLinecap="round" />
+      <path d="M8 46 C 22 46, 22 18, 36 18 S 50 30, 56 18" fill="none" stroke="#fff" strokeOpacity={0.35} strokeWidth={2} strokeLinecap="round" />
     </svg>
   )
 }

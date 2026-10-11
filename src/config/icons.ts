@@ -1,6 +1,15 @@
 // Zuordnung der Produkt-Icons (freigestellte PNGs in src/assets/icons) zu Geräte- und Leitungstypen.
 // Ohne Eintrag zeichnet die App ein vereinfachtes Ersatz-Icon. Nicht verwendete Icons liegen in
 // src/assets/icons/unused (siehe manifest.json) und sind hier bewusst nicht eingebunden.
+import sd4 from '../assets/icons/sd-4.png'
+import sdHerd from '../assets/icons/sd-herd.png'
+import pin from '../assets/icons/pin.png'
+import bell from '../assets/icons/bell.png'
+import ev from '../assets/icons/ev.png'
+import poe from '../assets/icons/poe.png'
+import kabAus from '../assets/icons/kab-aus.png'
+import cam from '../assets/icons/cam.png'
+import nfc from '../assets/icons/nfc.png'
 import cat from '../assets/icons/cat-kabel.png'
 import disp from '../assets/icons/disp.png'
 import doseAb from '../assets/icons/dose-ab.png'
@@ -27,6 +36,15 @@ export const DEVICE_IMG: Record<string, string> = {
   'sw-1': sw1,
   'sw-w': sw1, // Wechselschalter sieht von vorn aus wie der Ausschalter
   'sw-jal': swJal,
+  'sd-4': sd4,
+  'sd-herd': sdHerd,
+  'pin': pin,
+  'bell': bell,
+  'ev': ev,
+  'poe': poe,
+  'kab-aus': kabAus,
+  'cam': cam,
+  'nfc': nfc,
   'eth-1': eth1,
   'eth-2': eth2,
   'knx-4': knx4,

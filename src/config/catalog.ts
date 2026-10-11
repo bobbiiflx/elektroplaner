@@ -6,7 +6,7 @@ import type { ProjectSettings, ZoneSettings, InstallMethod } from '../types'
 // Maße in mm: w = Breite, h = Höhe, d = Vorstand vor der Wand.
 // ---------------------------------------------------------------------------
 
-export type DeviceCategory = 'power' | 'switch' | 'data' | 'knx' | 'display' | 'box'
+export type DeviceCategory = 'power' | 'switch' | 'data' | 'knx' | 'display' | 'iot' | 'box'
 
 export interface DeviceType {
   id: string
@@ -27,6 +27,7 @@ export const CATEGORY_LABEL: Record<DeviceCategory, string> = {
   data: 'Netzwerk / Daten',
   knx: 'KNX',
   display: 'Displays',
+  iot: 'IoT / Sicherheit',
   box: 'Dosen & Verteiler',
 }
 
@@ -34,17 +35,24 @@ export const DEVICE_TYPES: DeviceType[] = [
   { id: 'sd-1', name: 'Steckdose 1-fach', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#ff9f0a', price: 4.5, boxPrice: 1.2 },
   { id: 'sd-2', name: 'Steckdose 2-fach', category: 'power', defaultHeight: 300, w: 152, h: 80, d: 12, color: '#ff9f0a', price: 9, boxPrice: 2.4 },
   { id: 'sd-3', name: 'Steckdose 3-fach', category: 'power', defaultHeight: 300, w: 224, h: 80, d: 12, color: '#ff9f0a', price: 13.5, boxPrice: 3.6 },
+  { id: 'sd-4', name: 'Steckdose 4-fach', category: 'power', defaultHeight: 300, w: 296, h: 80, d: 12, color: '#ff9f0a', price: 18, boxPrice: 4.8 },
   { id: 'sd-herd', name: 'Herdanschluss 400 V', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 15, color: '#ff453a', price: 12, boxPrice: 2.5 },
   { id: 'sw-1', name: 'Schalter 1-fach', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 6, boxPrice: 1.2 },
   { id: 'sw-w', name: 'Wechselschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 7, boxPrice: 1.2 },
   { id: 'sw-2', name: 'Serienschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 9, boxPrice: 1.2 },
   { id: 'sw-jal', name: 'Jalousietaster', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#5e5ce6', price: 11, boxPrice: 1.2 },
+  { id: 'poe', name: 'RJ45-Auslass (PoE, Kamera / Access Point)', category: 'data', defaultHeight: 2400, w: 80, h: 80, d: 12, color: '#0a84ff', price: 16, boxPrice: 1.2 },
   { id: 'eth-1', name: 'Ethernet-Dose 1-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 14, boxPrice: 1.2 },
   { id: 'eth-2', name: 'Ethernet-Dose 2-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 24, boxPrice: 1.2 },
-  { id: 'knx-1', name: 'KNX-Taster 1-fach', category: 'knx', defaultHeight: 1050, w: 55, h: 55, d: 10, color: '#30d158', price: 70, boxPrice: 1.2 },
   { id: 'knx-4', name: 'KNX-Taster 4-fach', category: 'knx', defaultHeight: 1050, w: 80, h: 80, d: 10, color: '#30d158', price: 110, boxPrice: 1.2 },
   { id: 'knx-ts', name: 'KNX-Raumtemperaturregler', category: 'knx', defaultHeight: 1500, w: 80, h: 80, d: 10, color: '#30d158', price: 120, boxPrice: 1.2 },
   { id: 'disp', name: 'Wanddisplay (KNX)', category: 'display', defaultHeight: 1500, w: 200, h: 130, d: 15, color: '#bf5af2', price: 450, boxPrice: 8 },
+  { id: 'cam', name: 'Überwachungskamera (PoE)', category: 'iot', defaultHeight: 2400, w: 90, h: 90, d: 120, color: '#ff375f', price: 120, boxPrice: 3.5 },
+  { id: 'nfc', name: 'NFC-Leser (Zutritt)', category: 'iot', defaultHeight: 1200, w: 80, h: 80, d: 15, color: '#5ac8fa', price: 160, boxPrice: 1.2 },
+  { id: 'pin', name: 'PIN-Eingabetaster', category: 'iot', defaultHeight: 1200, w: 85, h: 85, d: 15, color: '#5e5ce6', price: 95, boxPrice: 1.2 },
+  { id: 'bell', name: 'Video-Türklingel', category: 'iot', defaultHeight: 1400, w: 70, h: 150, d: 25, color: '#ac8e68', price: 140, boxPrice: 2.5 },
+  { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0 },
+  { id: 'kab-aus', name: 'Kabelauslassdose (Bürste)', category: 'box', defaultHeight: 1100, w: 80, h: 80, d: 12, color: '#8e8e93', price: 7, boxPrice: 1.2 },
   { id: 'dose-ab', name: 'Abzweigdose', category: 'box', defaultHeight: 2300, w: 80, h: 80, d: 4, color: '#8e8e93', price: 1.8, boxPrice: 0 },
   { id: 'uv', name: 'Unterverteiler', category: 'box', defaultHeight: 1500, w: 400, h: 600, d: 80, color: '#636366', price: 120, boxPrice: 0 },
 ]

@@ -1,7 +1,6 @@
 {
  "used": {
   "sd-1.png": "c01",
-  "sd-3.png": "a15",
   "sw-1.png": "c03",
   "sw-jal.png": "c11",
   "eth-1.png": "c02",
@@ -17,7 +16,17 @@
   "sw-2.png": "d04 (4. Blatt)",
   "knx-4.png": "d02 (4. Blatt)",
   "cat-kabel.png": "d05 (4. Blatt)",
-  "knx-bus.png": "d06 (4. Blatt)"
+  "knx-bus.png": "d06 (4. Blatt)",
+  "sd-3.png": "5. Blatt e03",
+  "sd-4.png": "5. Blatt e04",
+  "sd-herd.png": "5. Blatt e09",
+  "pin.png": "5. Blatt e02",
+  "bell.png": "5. Blatt e01",
+  "ev.png": "5. Blatt e05",
+  "poe.png": "5. Blatt e10",
+  "kab-aus.png": "5. Blatt e11",
+  "cam.png": "aus Archiv",
+  "nfc.png": "aus Archiv"
  },
  "unused": {
   "steckdose-1fach-foto.png": "steckdose-1fach-foto (Duplikat zu sd-1)",
@@ -49,8 +58,6 @@
   "wlan-steckdose.png": "wlan-steckdose",
   "patchkabel-rj45-blau.png": "patchkabel-rj45-blau",
   "unterputz-geraetedose-orange.png": "unterputz-geraetedose-orange",
-  "ueberwachungskamera.png": "ueberwachungskamera",
-  "funk-lesegeraet-schwarz.png": "funk-lesegeraet-schwarz",
   "ls-schalter-2polig.png": "ls-schalter-2polig",
   "kleinverteiler-aufputz.png": "kleinverteiler-aufputz (Duplikat zu b01)",
   "steckdose-2fach-senkrecht-icon.png": "frühere Wahl für sd-2 (senkrecht)",
@@ -63,6 +70,15 @@
   "ueberwachungskamera-v2.png": "4. Blatt d12",
   "wanddisplay-v2.png": "4. Blatt d13",
   "deckenmelder-praesenz.png": "4. Blatt d14",
-  "ls-schalter-2polig-v2.png": "4. Blatt d16"
+  "ls-schalter-2polig-v2.png": "4. Blatt d16",
+  "steckdose-3fach-foto-waagerecht.png": "frühere Wahl für sd-3 (Foto-Stil)",
+  "tv-dose.png": "5. Blatt e06",
+  "hdmi-kabel.png": "5. Blatt e07",
+  "knx-aktor-8fach.png": "5. Blatt e08",
+  "schalter-1fach-v2.png": "5. Blatt e12",
+  "steckdosenleiste-4fach-schalter.png": "5. Blatt e13",
+  "gluehbirne.png": "5. Blatt e14",
+  "thermo-hygrometer.png": "5. Blatt e15",
+  "erdungsleitung-rolle.png": "5. Blatt e16"
  }
 }

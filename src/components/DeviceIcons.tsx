@@ -32,6 +32,8 @@ export function PlanSymbolShape({
       return <polygon points={`0,${-r * 1.25} ${r * 1.25},0 0,${r * 1.25} ${-r * 1.25},0`} fill={fill} stroke={stroke} strokeWidth={sw} />
     case 'display':
       return <rect x={-r * 1.6} y={-r} width={r * 3.2} height={2 * r} rx={r * 0.25} fill={fill} stroke={stroke} strokeWidth={sw} />
+    case 'iot':
+      return <polygon points={`${r * 1.2},0 ${r * 0.6},${r * 1.05} ${-r * 0.6},${r * 1.05} ${-r * 1.2},0 ${-r * 0.6},${-r * 1.05} ${r * 0.6},${-r * 1.05}`} fill={fill} stroke={stroke} strokeWidth={sw} />
     case 'box':
       return <rect x={-r * 0.8} y={-r * 0.8} width={r * 1.6} height={r * 1.6} fill="var(--paper)" stroke={fill} strokeWidth={sw * 1.4} />
     default:
@@ -153,6 +155,79 @@ export function DeviceFace({ dt }: { dt: DeviceType }) {
           ))}
         </g>
       )
+    case 'sd-4':
+      return (
+        <g>
+          <Plate w={w} h={h} />
+          <Socket cx={-111} />
+          <Socket cx={-37} />
+          <Socket cx={37} />
+          <Socket cx={111} />
+        </g>
+      )
+    case 'poe':
+      return (
+        <g>
+          <Plate w={w} h={h} />
+          <Port color={dt.color} />
+          <text y={31} textAnchor="middle" fontSize={11} fontWeight={700} fill={dt.color}>
+            PoE
+          </text>
+        </g>
+      )
+    case 'kab-aus':
+      return (
+        <g>
+          <Plate w={w} h={h} />
+          <rect x={-26} y={-8} width={52} height={22} rx={3} fill="#1c1c1e" />
+          <rect x={-26} y={-24} width={52} height={10} rx={3} fill={FIELD} stroke={SOFT} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'pin':
+      return (
+        <g>
+          <Plate w={w} h={h} />
+          {[0, 1, 2, 3].flatMap((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={-26 + c * 19} y={-30 + r * 15.5} width={14} height={11} rx={2.5} fill={FIELD} stroke={SOFT} strokeWidth={0.9} vectorEffect="non-scaling-stroke" />))}
+        </g>
+      )
+    case 'nfc':
+      return (
+        <g>
+          <Plate w={w} h={h} r={9} dark />
+          <rect x={-w / 2 + 8} y={-h / 2 + 8} width={w - 16} height={h - 16} rx={6} fill="none" stroke={dt.color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          {[10, 18, 26].map((r) => (
+            <path key={r} d={`M ${-r * 0.8} ${-4 - r * 0.45} A ${r} ${r} 0 0 1 ${r * 0.8} ${-4 - r * 0.45}`} fill="none" stroke={dt.color} strokeWidth={2.4} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          ))}
+          <rect x={-9} y={6} width={18} height={14} rx={3} fill="none" stroke={dt.color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'bell':
+      return (
+        <g>
+          <Plate w={w} h={h} r={9} />
+          <rect x={-24} y={-h / 2 + 8} width={48} height={64} rx={7} fill="#1c1c1e" />
+          <circle cx={0} cy={-h / 2 + 28} r={9} fill="#2c4f78" stroke={SOFT} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          <circle cx={0} cy={h / 2 - 26} r={14} fill="none" stroke={dt.color} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'cam':
+      return (
+        <g>
+          <circle r={44} fill={PLATE} stroke={SOFT} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+          <circle r={30} fill="#1c1c1e" />
+          <circle r={14} fill="#2c4f78" />
+          <circle cx={-5} cy={-5} r={4} fill="#fff" opacity={0.7} />
+        </g>
+      )
+    case 'ev':
+      return (
+        <g>
+          <Plate w={w} h={h} r={30} />
+          <rect x={-w / 2 + 40} y={-h / 2 + 70} width={w - 80} height={260} rx={18} fill="#1c1c1e" />
+          <circle cx={0} cy={-h / 2 + 400} r={60} fill="none" stroke={dt.color} strokeWidth={8} vectorEffect="non-scaling-stroke" />
+          <circle cx={0} cy={h / 2 - 280} r={80} fill={FIELD} stroke={SOFT} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
     case 'sw-1':
       return (
         <g>
@@ -197,14 +272,6 @@ export function DeviceFace({ dt }: { dt: DeviceType }) {
           <Plate w={w} h={h} />
           <Port cy={-20} w={34} h={24} color={dt.color} />
           <Port cy={20} w={34} h={24} color={dt.color} />
-        </g>
-      )
-    case 'knx-1':
-      return (
-        <g>
-          <Plate w={w} h={h} />
-          <rect x={-18} y={-18} width={36} height={36} rx={5} fill={FIELD} stroke={dt.color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
-          <circle r={4} fill={dt.color} />
         </g>
       )
     case 'knx-4':

@@ -229,6 +229,16 @@ export interface Project {
   prices?: Record<string, number> // eigene Einzelpreise (€) je Position, überschreiben die Richtwerte
   scenes?: Scene[]
   cabinet?: { rowTE: number; reservePct: number } // Schaltschrank-Belegung
+  suppliers?: Record<string, string> // Händler je Material-Position (Schlüssel wie bei prices)
+  material?: { endMm: number; wastePct: number } // Leitungszuschlag je Ende (mm) und Verschnitt (%)
+  variants?: Variant[] // gemerkte Materialstände zum Vergleichen (z. B. KNX gegen konventionell)
+}
+export interface Variant {
+  id: string
+  name: string
+  at: string // ISO
+  net: number
+  lines: { key: string; name: string; unit: 'Stk' | 'm'; qty: number; sum: number }[]
 }
 
 export interface PriceSource {

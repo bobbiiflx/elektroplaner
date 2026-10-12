@@ -1,7 +1,7 @@
 import { DIM_LABEL, deviceType } from '../config/catalog'
 import type { Project } from '../types'
 import { roleOf } from './groups'
-import { VAT, materialList } from './material'
+import { VAT, materialList, purchaseList, rings } from './material'
 import { actuatorChannels, actuatorNeeds, circuitRows, wayRows } from './schrank'
 import { formatLen } from './units'
 
@@ -24,6 +24,7 @@ export interface ListTables {
   scenes: Table
   ways: Table
   material: Table
+  shopping: Table
   waysTotal: number
   unassigned: number
 }
@@ -82,5 +83,13 @@ export function buildTables(project: Project, unit: 'mm' | 'cm' | 'm', opt: { fl
     ],
     right: [2, 4, 5],
   }
-  return { circuits, needs, channels, ga, scenes, ways, material, waysTotal: ways0.reduce((s, w) => s + w.len, 0), unassigned: unassigned.length }
+  const shopping: Table = {
+    head: ['Händler', 'Position', 'Menge', 'Einheit', 'Summe €'],
+    rows: purchaseList(mat.lines).flatMap((g) => [
+      ...g.lines.map((l) => [g.supplier, l.name + (l.unit === 'm' && l.key.startsWith('cab:') ? ` (${rings(l.qty)} × 100-m-Ring)` : ''), num(l.qty, l.unit === 'm' ? 1 : 0), l.unit, num(l.sum, 2)] as Cell[]),
+      [g.supplier, 'Zwischensumme netto', '', '', num(g.net, 2)] as Cell[],
+    ]),
+    right: [2, 4],
+  }
+  return { circuits, needs, channels, ga, scenes, ways, material, shopping, waysTotal: ways0.reduce((s, w) => s + w.len, 0), unassigned: unassigned.length }
 }

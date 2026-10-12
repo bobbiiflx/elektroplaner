@@ -584,7 +584,7 @@ export default function PrintView() {
       const T = buildTables(project, unit)
       const defs: { title: string; t: Table }[] = []
       if (opts.lists) defs.push({ title: 'Stromkreisliste', t: T.circuits }, { title: 'Aktorbedarf je Verteiler', t: T.needs }, { title: 'Aktorkanäle', t: T.channels }, { title: 'Gruppenadressen', t: T.ga }, { title: 'Szenen', t: T.scenes }, { title: `Leitungswege zum Verteiler (Summe ${formatLen(T.waysTotal, 'm')})`, t: T.ways })
-      if (opts.material) defs.push({ title: 'Material & Kosten (netto, Richtwerte)', t: T.material })
+      if (opts.material) defs.push({ title: 'Material & Kosten (netto, Richtwerte)', t: T.material }, { title: 'Einkaufsliste nach Händler', t: T.shopping })
       const cap = Math.max(6, Math.floor(((areaH - 14) / 6.4) * 0.85))
       for (const { title, t } of defs) {
         if (!t.rows.length) continue

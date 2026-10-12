@@ -9,13 +9,13 @@ import { formatLen } from '../lib/units'
 import { useStore } from '../store'
 import { Modal, Segmented } from './ui'
 import { NumberField } from './NumberField'
-import { VAT, materialList } from '../lib/material'
+import { DEFAULT_MATERIAL, VAT, compareVariant, materialList, toVariant } from '../lib/material'
 import { RICHTWERT_NAME } from '../lib/priceSources'
 import PriceImportDialog from './PriceImportDialog'
 import { CabinetDiagram, CabinetLayout } from './CabinetViews'
 import { DEFAULT_CABINET_OPTS, planCabinet } from '../lib/cabinet'
 
-type Tab = 'circuits' | 'cabinet' | 'channels' | 'ga' | 'ways' | 'material'
+type Tab = 'circuits' | 'cabinet' | 'channels' | 'ga' | 'ways' | 'material' | 'shopping'
 
 function DataTable({ t }: { t: Table }) {
   return (
@@ -59,6 +59,7 @@ export default function SchrankDialog() {
   const [matFloor, setMatFloor] = useState('')
   const [withRuns, setWithRuns] = useState(true)
   const [importOpen, setImportOpen] = useState(false)
+  const [cmpId, setCmpId] = useState('')
   const edit = useStore((s) => s.edit)
   const m = (mm: number) => formatLen(mm, unit === 'mm' ? 'm' : unit === 'cm' ? 'm' : unit)
 
@@ -71,7 +72,8 @@ export default function SchrankDialog() {
   if (!open || !data) return null
 
   const T = buildTables(project, unit, { floorId: matFloor || undefined, runs: withRuns })
-  const { circuits, needs, channels, ga, scenes, ways, material: matTable } = T
+  const { circuits, needs, channels, ga, scenes, ways, material: matTable, shopping } = T
+  const setAsk = useStore.getState().setAsk
   const eur = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
   const total = T.waysTotal
 
@@ -86,10 +88,12 @@ export default function SchrankDialog() {
           ? { tables: [{ title: 'Gruppenadressen', t: ga }, { title: 'Szenen', t: scenes }] }
           : tab === 'ways'
             ? { tables: [{ title: `Leitungswege zum Verteiler (Summe ${m(total)})`, t: ways }] }
-            : { tables: [{ title: 'Material & Kosten (netto)', t: matTable }] }
+            : tab === 'shopping'
+              ? { tables: [{ title: 'Einkaufsliste nach Händler (netto)', t: shopping }] }
+              : { tables: [{ title: 'Material & Kosten (netto)', t: matTable }] }
 
   const csv = () => current.tables.map(({ title, t }) => toCsv([[title], t.head, ...t.rows])).join('\r\n\r\n')
-  const label = { circuits: 'stromkreise', cabinet: 'belegung', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege', material: 'material' }[tab]
+  const label = { circuits: 'stromkreise', cabinet: 'belegung', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege', material: 'material', shopping: 'einkaufsliste' }[tab]
   const safe = project.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '_').trim() || 'projekt'
 
   return (
@@ -141,6 +145,7 @@ export default function SchrankDialog() {
             { value: 'ga', label: 'Gruppenadressen' },
             { value: 'ways', label: 'Leitungswege' },
             { value: 'material', label: 'Material & Kosten' },
+            { value: 'shopping', label: 'Einkaufsliste' },
           ]}
         />
       </div>
@@ -199,6 +204,73 @@ export default function SchrankDialog() {
               <input type="checkbox" checked={withRuns} onChange={(e) => setWithRuns(e.target.checked)} /> geschätzte Zuleitungen zum Verteiler einrechnen
             </label>
           </div>
+          <div className="mat-opts">
+            <label className="check">
+              Zuschlag je Leitungsende
+              <NumberField value={(project.material ?? DEFAULT_MATERIAL).endMm / 10} decimals={0} suffix="cm" min={0} max={100} onCommit={(v) => edit((p) => void (p.material = { ...(p.material ?? DEFAULT_MATERIAL), endMm: v * 10 }))} />
+            </label>
+            <label className="check">
+              Verschnitt
+              <NumberField value={(project.material ?? DEFAULT_MATERIAL).wastePct} decimals={0} suffix="%" min={0} max={50} onCommit={(v) => edit((p) => void (p.material = { ...(p.material ?? DEFAULT_MATERIAL), wastePct: v }))} />
+            </label>
+            <button
+              className="btn small"
+              onClick={() =>
+                setAsk({
+                  title: 'Variante merken',
+                  message: 'Der aktuelle Material- und Kostenstand wird unter diesem Namen gespeichert und kann später mit dem Plan verglichen werden.',
+                  initial: `Variante ${(project.variants?.length ?? 0) + 1}`,
+                  okLabel: 'Merken',
+                  onOk: (name) => name && edit((p) => void (p.variants = [...(p.variants ?? []), toVariant(name, data.mat.lines, data.mat.net)])),
+                })
+              }
+            >
+              Variante merken …
+            </button>
+          </div>
+          {(project.variants?.length ?? 0) > 0 && (() => {
+            const v = project.variants!.find((x) => x.id === cmpId) ?? project.variants![0]
+            const cmp = compareVariant(v, data.mat)
+            const d = cmp.netB - cmp.netA
+            return (
+              <div className="schrank-table">
+                <div className="mat-opts">
+                  <label className="check">
+                    Vergleich mit
+                    <select value={v.id} onChange={(e) => setCmpId(e.target.value)}>
+                      {project.variants!.map((x) => (
+                        <option key={x.id} value={x.id}>{x.name} ({new Date(x.at).toLocaleDateString('de-DE')})</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="btn small danger" onClick={() => edit((p) => void (p.variants = (p.variants ?? []).filter((x) => x.id !== v.id)))}>
+                    Variante löschen
+                  </button>
+                </div>
+                <p className="muted small">
+                  „{v.name}“: {eur(cmp.netA)} netto · aktuell: {eur(cmp.netB)} netto · <b>Differenz {d >= 0 ? '+' : ''}{eur(d)}</b> ({d >= 0 ? 'aktuell teurer' : 'aktuell günstiger'})
+                </p>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr><th>Position</th><th className="r">Variante</th><th className="r">Aktuell</th><th className="r">Differenz €</th></tr>
+                    </thead>
+                    <tbody>
+                      {cmp.rows.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.name}</td>
+                          <td className="r">{num(r.qtyA, r.unit === 'm' ? 1 : 0)} {r.unit}</td>
+                          <td className="r">{num(r.qtyB, r.unit === 'm' ? 1 : 0)} {r.unit}</td>
+                          <td className="r">{(r.sumB - r.sumA >= 0 ? '+' : '') + num(r.sumB - r.sumA, 2)}</td>
+                        </tr>
+                      ))}
+                      {cmp.rows.length === 0 && <tr><td colSpan={4} className="muted">Keine Unterschiede.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -206,6 +278,7 @@ export default function SchrankDialog() {
                   <th>Position</th>
                   <th className="r">Menge</th>
                   <th>Einheit</th>
+                  <th>Händler</th>
                   <th className="r">Einzelpreis €</th>
                   <th className="r">Summe €</th>
                 </tr>
@@ -215,13 +288,22 @@ export default function SchrankDialog() {
                   <Fragment key={l.key}>
                     {(i === 0 || data.mat.lines[i - 1].group !== l.group) && (
                       <tr key={'g' + l.group} className="group-row">
-                        <td colSpan={5}>{l.group}</td>
+                        <td colSpan={6}>{l.group}</td>
                       </tr>
                     )}
                     <tr title={l.note}>
                       <td>{l.name}</td>
                       <td className="r">{num(l.qty, l.unit === 'm' ? 1 : 0)}</td>
                       <td>{l.unit}</td>
+                      <td>
+                        <input
+                          className="text"
+                          list="suppliers"
+                          style={{ width: 170 }}
+                          value={l.supplier}
+                          onChange={(e) => edit((p) => void ((p.suppliers = p.suppliers ?? {})[l.key] = e.target.value), `sup:${l.key}`)}
+                        />
+                      </td>
                       <td className="r price-cell">
                         <NumberField
                           value={l.price}
@@ -237,21 +319,21 @@ export default function SchrankDialog() {
                 ))}
                 {data.mat.lines.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="muted">
+                    <td colSpan={6} className="muted">
                       Noch keine Positionen.
                     </td>
                   </tr>
                 )}
                 <tr className="sum-row">
-                  <td colSpan={4}>Summe netto</td>
+                  <td colSpan={5}>Summe netto</td>
                   <td className="r">{eur(data.mat.net)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={4}>MwSt. {Math.round(VAT * 100)} %</td>
+                  <td colSpan={5}>MwSt. {Math.round(VAT * 100)} %</td>
                   <td className="r">{eur(data.mat.net * VAT)}</td>
                 </tr>
                 <tr className="sum-row">
-                  <td colSpan={4}>Summe brutto</td>
+                  <td colSpan={5}>Summe brutto</td>
                   <td className="r">{eur(data.mat.net * (1 + VAT))}</td>
                 </tr>
               </tbody>
@@ -296,6 +378,7 @@ export default function SchrankDialog() {
           </div>
         )
       })()}
+      {tab === 'material' && <datalist id="suppliers">{[...new Set(data.mat.lines.map((l) => l.supplier))].map((x) => <option key={x} value={x} />)}</datalist>}
       {tab !== 'material' && current.tables.map(({ title, t }) => (
         <div key={title} className="schrank-table">
           <h3>{title}</h3>

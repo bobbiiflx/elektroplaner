@@ -537,3 +537,24 @@ describe('Schaltschrank-Belegung', () => {
     expect(cab.terminals.n).toBeGreaterThan(14)
   })
 })
+
+import { compareVariant, purchaseList, toVariant } from './material'
+describe('Material: Händler, Verschnitt, Varianten', () => {
+  it('Zuschlag erhöht Leitungsmenge; Variantenvergleich zeigt Differenz; Einkaufsliste gruppiert', () => {
+    const p = sampleProject()
+    p.material = { endMm: 0, wastePct: 0 }
+    const a = materialList(p, { includeRuns: false })
+    p.material = { endMm: 100, wastePct: 10 }
+    const b = materialList(p, { includeRuns: false })
+    const ca = a.lines.find((l) => l.key.startsWith('cab:'))!
+    const cb = b.lines.find((l) => l.key === ca.key)!
+    expect(cb.qty).toBeGreaterThan(ca.qty * 1.09)
+    const v = toVariant('ohne Zuschlag', a.lines, a.net)
+    const diff = compareVariant(v, b)
+    expect(diff.netB).toBeGreaterThan(diff.netA)
+    expect(diff.rows.length).toBeGreaterThan(0)
+    p.suppliers = { [ca.key]: 'Elektro-Großhandel' }
+    const groups = purchaseList(materialList(p, { includeRuns: false }).lines)
+    expect(groups.some((g) => g.supplier === 'Elektro-Großhandel')).toBe(true)
+  })
+})

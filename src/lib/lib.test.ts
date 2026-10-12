@@ -465,3 +465,21 @@ describe('Gaube und Loggia', () => {
     expect(loggiaNotes(f).map((n) => n.id)).toEqual(['d1'])
   })
 })
+
+import { planChecks } from './checks'
+describe('Planprüfung', () => {
+  it('meldet fehlenden FI und Überlast, nicht bei sauberem Stromkreis', () => {
+    const p = sampleProject()
+    const dev = p.floors[0].devices.find((d) => deviceType(d.typeId).category === 'power')!
+    p.circuits = [{ id: 'c1', name: 'F1 Test', rating: 16, charac: 'B', phase: 'L1', rcd: '', color: '#f00' } as never]
+    dev.circuitId = 'c1'
+    dev.powerW = 5000
+    const t = planChecks(p).map((c) => c.text)
+    expect(t.some((x) => x.includes('kein FI'))).toBe(true)
+    expect(t.some((x) => x.includes('Summenleistung'))).toBe(true)
+    p.circuits[0].rcd = 'FI 1 · 30 mA'
+    dev.powerW = 1000
+    const t2 = planChecks(p).map((c) => c.text)
+    expect(t2.some((x) => x.includes('FI') || x.includes('Summenleistung'))).toBe(false)
+  })
+})

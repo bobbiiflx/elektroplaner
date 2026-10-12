@@ -23,6 +23,7 @@ import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } fr
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
 import { OPENING_TYPES, openingDef } from '../config/catalog'
+import { planChecks } from '../lib/checks'
 import { loggiaNotes, rectArea, rectWidth, roofContour, roofIssues } from '../lib/roof'
 import type { Dormer, Loggia, RoofPlane } from '../types'
 import { OpeningIcon } from './OpeningGlyphs'
@@ -692,6 +693,33 @@ function BuildSections({ floor }: { floor: Floor }) {
   )
 }
 
+/** Projektweite Planprüfung (Schaltschrank-Tab) */
+function PlanChecks() {
+  const project = useStore((s) => s.project)
+  const setActiveFloor = useStore((s) => s.setActiveFloor)
+  const select = useStore((s) => s.select)
+  const list = useMemo(() => planChecks(project), [project])
+  return (
+    <Section title={`Planprüfung${list.length ? ` · ${list.length}` : ''}`}>
+      {!list.length && <p className="muted small">Keine Auffälligkeiten (FI, Überlast, Spannungsfall, Dachschräge).</p>}
+      {list.map((c, i) => (
+        <button
+          key={i}
+          className="warn-item"
+          style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 0, padding: '4px 0', cursor: c.target ? 'pointer' : 'default', color: 'var(--warn, #b45309)', font: 'inherit', fontSize: 12 }}
+          onClick={() => {
+            if (c.floorId) setActiveFloor(c.floorId)
+            if (c.target) select(c.target)
+          }}
+        >
+          ⚠ {c.text}
+        </button>
+      ))}
+      <p className="muted small">Vereinfachte Prüfung – ersetzt keine Abnahme nach VDE 0100 durch eine Elektrofachkraft.</p>
+    </Section>
+  )
+}
+
 /** Tab-Leiste: Elektro · KNX · Schrank, Bau als Symbol. Ein Klick beendet die Auswahl und zeigt den Tab. */
 function InspectorTabs() {
   const tab = useStore((s) => s.inspectorTab)
@@ -772,6 +800,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
       <InspectorTabs />
       {tab !== 'floor' && <RoofWarnings floor={floor} />}
       {tab !== 'floor' && <LoggiaWarnings floor={floor} />}
+      {tab === 'cabinet' && <PlanChecks />}
       {tab === 'floor' && (
       <>
       <Section title="Geschoss">

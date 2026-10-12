@@ -22,6 +22,7 @@ import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 import * as bk from './lib/backup'
 import { shrinkImage } from './lib/image'
+import { missingDevices, type ProposedCircuit } from './lib/autoplan'
 import type { BackupState } from './lib/backup'
 
 const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'room', 'roof', 'dormer', 'loggia', 'skylight', 'calibrate', 'anchor']
@@ -137,6 +138,8 @@ interface State {
   showToast: (msg: string) => void
   refreshBackup: () => Promise<void>
   setNoteText: (elId: string, text: string) => void
+  applyCircuitPlan: (list: ProposedCircuit[]) => void
+  addMissingToRoom: (floorId: string, roomId: string) => number
   addPhotos: (elId: string, files: File[]) => Promise<void>
   removePhoto: (elId: string, photoId: string) => void
   setBackupFolder: () => Promise<void>
@@ -451,6 +454,30 @@ export const useStore = create<State>((set, get) => ({
     set({ toast: msg })
     window.clearTimeout(toastTimer)
     toastTimer = window.setTimeout(() => set({ toast: null }), 4500)
+  },
+
+  applyCircuitPlan: (list) =>
+    get().edit((p) => {
+      p.circuits = p.circuits ?? []
+      for (const c of list) {
+        const id = uid('c_')
+        p.circuits.push({ id, name: c.name, rating: c.rating, charac: c.charac, phase: c.phase, rcd: c.rcd, color: CIRCUIT_COLORS[p.circuits.length % CIRCUIT_COLORS.length] })
+        for (const f of p.floors) for (const d of f.devices) if (c.deviceIds.includes(d.id)) d.circuitId = id
+      }
+    }),
+
+  addMissingToRoom: (floorId, roomId) => {
+    const project = get().project
+    const floor = project.floors.find((f) => f.id === floorId)
+    const room = floor?.rooms?.find((r) => r.id === roomId)
+    if (!floor || !room) return 0
+    const add = missingDevices(project, floor, room, () => uid('d_'))
+    if (!add.length) return 0
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === floorId)
+      for (const a of add) f?.devices.push(a.device)
+    })
+    return add.length
   },
 
   setNoteText: (elId, text) =>

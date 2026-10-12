@@ -582,3 +582,44 @@ describe('Räume', () => {
     expect(roomIssues(p).some((i) => i.text.includes('Steckdosen'))).toBe(true)
   })
 })
+
+import { missingDevices, suggestCircuits, finishProposal } from './autoplan'
+describe('Autoplanung', () => {
+  const setup = () => {
+    const f = newFloor(DEFAULT_SETTINGS, 'EG')
+    const mk = (id: string, a: [number, number], b: [number, number]) => ({ id, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, thickness: 200, kind: 'inner' as const })
+    f.walls = [mk('a', [0, 0], [4000, 0]), mk('b', [4000, 0], [4000, 3000]), mk('c', [4000, 3000], [0, 3000]), mk('d', [0, 3000], [0, 0])]
+    const poly = detectRoom(f, { x: 2000, y: 1500 })!
+    f.rooms = [{ id: 'r', name: 'Wohnen', type: 'living', poly }]
+    f.openings = [{ id: 'o', wallId: 'c', type: 'door', offset: 500, width: 1000, height: 2100, sill: 0 }]
+    const p = sampleProject()
+    p.floors = [f]
+    p.circuits = []
+    return { f, p }
+  }
+  it('ergänzt fehlende Steckdosen, Licht und Schalter und erfüllt danach das Soll', () => {
+    const { f, p } = setup()
+    let n = 0
+    const add = missingDevices(p, f, f.rooms![0], () => 'n' + n++)
+    expect(add.length).toBeGreaterThan(5)
+    f.devices.push(...add.map((a) => a.device))
+    expect(roomIssues(p)).toHaveLength(0)
+    // keine Wandgeräte in Öffnungen
+    for (const d of f.devices.filter((x) => x.wallId === 'c')) expect(d.offset <= 350 || d.offset >= 1650).toBe(true)
+  })
+  it('bildet Stromkreise: Licht/Steckdosen getrennt, Herd 3-phasig, FI-Gruppen, nur Unzugeordnetes', () => {
+    const { f, p } = setup()
+    let n = 0
+    f.devices.push(...missingDevices(p, f, f.rooms![0], () => 'n' + n++).map((a) => a.device))
+    f.devices.push({ id: 'h', typeId: 'sd-herd', wallId: 'a', offset: 3000, side: 1, height: 300 } as never)
+    const plan = finishProposal(p, suggestCircuits(p))
+    expect(plan.some((c) => c.name.startsWith('Licht'))).toBe(true)
+    expect(plan.some((c) => c.name.startsWith('Steckdosen'))).toBe(true)
+    expect(plan.find((c) => c.name.startsWith('Herd'))?.phase).toBe('3L')
+    expect(plan.every((c) => /FI \d+ · 30 mA/.test(c.rcd))).toBe(true)
+    const all = plan.flatMap((c) => c.deviceIds)
+    expect(new Set(all).size).toBe(all.length)
+    f.devices.forEach((d) => (d.circuitId = 'x'))
+    expect(suggestCircuits(p)).toHaveLength(0)
+  })
+})

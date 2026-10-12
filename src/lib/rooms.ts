@@ -154,7 +154,7 @@ export interface RoomStats {
 const SOCKET_TOL = 400 // mm: Geräte an der Wandfläche gehören zum nächstgelegenen Raum
 
 /** Geräte je Raum: nächster Raum (Abstand ≤ Toleranz) */
-function roomOfDevice(floor: Floor, p: Vec2): Room | null {
+export function roomOfDevice(floor: Floor, p: Vec2): Room | null {
   let best: Room | null = null
   let bd = SOCKET_TOL
   for (const r of floor.rooms ?? []) {

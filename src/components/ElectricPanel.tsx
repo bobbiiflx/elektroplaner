@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, CheckCircle2, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { CIRCUIT_COLORS, DIM_LABEL, FUSE_OPTIONS, deviceType, kindOf } from '../config/catalog'
 import { canJoinGroups } from '../lib/groups'
 import { MISSING_LABEL, circuitStats, missingFor, openPoints, type ColorBy, type MissingKey } from '../lib/completeness'
@@ -7,9 +8,59 @@ import { useStore } from '../store'
 import type { Circuit, Device, Floor, Phase } from '../types'
 import { NumberField } from './NumberField'
 import { GroupSelect } from './GroupsPanel'
-import { Row, Section, Segmented } from './ui'
+import { Modal, Row, Section, Segmented } from './ui'
+import { finishProposal, suggestCircuits } from '../lib/autoplan'
 
 const NEW = '__new__'
+
+/** Vorschau und Übernahme des automatischen Stromkreis-Vorschlags. */
+function SuggestDialog({ onClose }: { onClose: () => void }) {
+  const project = useStore((s) => s.project)
+  const apply = useStore((s) => s.applyCircuitPlan)
+  const showToast = useStore((s) => s.showToast)
+  const plan = useMemo(() => finishProposal(project, suggestCircuits(project)), [project])
+  return (
+    <Modal
+      title="Stromkreise vorschlagen"
+      onClose={onClose}
+      width={520}
+      footer={
+        <button
+          className="btn primary"
+          disabled={!plan.length}
+          onClick={() => {
+            apply(plan)
+            showToast(`${plan.length} Stromkreise angelegt.`)
+            onClose()
+          }}
+        >
+          {plan.length} Stromkreise übernehmen
+        </button>
+      }
+    >
+      {!plan.length ? (
+        <p className="muted">Alle Steckdosen und Leuchten sind bereits einem Stromkreis zugeordnet.</p>
+      ) : (
+        <>
+          <p className="muted small">
+            Nur Geräte ohne Stromkreis werden zugeordnet. Licht und Steckdosen getrennt, Küche, Bad und Hauswirtschaftsraum eigene Kreise, Herd und Großverbraucher einzeln, höchstens 10 Auslässe je Kreis, alle mit FI 30 mA. Richtwerte, bitte vor dem Bau elektrofachlich prüfen.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 340, overflow: 'auto' }}>
+            {plan.map((c, i) => (
+              <div key={i} className="menu-item" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>{c.name}</div>
+                <div className="muted small">
+                  {c.charac}
+                  {c.rating} · {c.phase === '3L' ? '3 Ph.' : c.phase} · {c.rcd} · {c.deviceIds.length} {c.deviceIds.length === 1 ? "Gerät" : "Geräte"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Modal>
+  )
+}
 const NO_CIRCUITS: Circuit[] = []
 
 /** Auswahl eines Stromkreises mit „Neuer Stromkreis …“; liefert die ID (oder '' für keinen). */
@@ -161,6 +212,7 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
   const [filter, setFilter] = useState<MissingKey | ''>('')
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [bulkCircuit, setBulkCircuit] = useState('')
+  const [suggest, setSuggest] = useState(false)
   const [bulkGroup, setBulkGroup] = useState('')
   const shown = points.filter((p) => !filter || p.missing.includes(filter))
 
@@ -213,12 +265,18 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
 
   return (
     <>
+      {suggest && createPortal(<SuggestDialog onClose={() => setSuggest(false)} />, document.body)}
       <Section
         title="Stromkreise"
         aside={
-          <button className="btn small" onClick={() => addCircuit()}>
-            <Plus size={13} /> Neu
-          </button>
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button className="btn small" onClick={() => setSuggest(true)} title="Aus den Räumen automatisch Stromkreise bilden">
+              <Sparkles size={13} /> Vorschlag
+            </button>
+            <button className="btn small" onClick={() => addCircuit()}>
+              <Plus size={13} /> Neu
+            </button>
+          </span>
         }
       >
         {circuits.length === 0 && <p className="muted small">Noch keine Stromkreise. Lege welche an oder erzeuge sie direkt beim Zuordnen eines Geräts.</p>}

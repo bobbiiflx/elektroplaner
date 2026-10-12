@@ -513,6 +513,8 @@ function RoomPanel({ room, floor }: { room: Room; floor: Floor }) {
     }, key)
   const req = roomReq(project, room.type)
   const st = roomStats(floor, room)
+  const addMissing = useStore((s) => s.addMissingToRoom)
+  const showToast = useStore((s) => s.showToast)
   const row = (label: string, have: number, need: number | null) => (
     <Row label={label}>
       <b style={{ color: need !== null && have < need ? 'var(--danger)' : undefined }}>
@@ -545,6 +547,17 @@ function RoomPanel({ room, floor }: { room: Room; floor: Floor }) {
           <NumberField value={req.lights} decimals={0} min={0} max={30} suffix="Licht" onCommit={(v) => edit((p) => void ((p.roomReq ??= {})[room.type] = { ...req, lights: v }))} />
         </span>
       </Row>
+      {(st.sockets < req.sockets || st.lights < req.lights || (st.lights > 0 && st.switches === 0)) && (
+        <button
+          className="btn block"
+          onClick={() => {
+            const n = addMissing(floor.id, room.id)
+            showToast(n ? `${n} Gerät(e) ergänzt – bitte Position prüfen.` : 'Es konnte nichts ergänzt werden (kein Platz an den Wänden).')
+          }}
+        >
+          Fehlende Ausstattung ergänzen
+        </button>
+      )}
       <p className="muted small">Geräte zählen zum Raum, an dessen Wandseite oder Fläche sie sitzen. Steckdosen: 2-fach = 2. Soll-Werte sind Richtwerte nach DIN 18015-2 (Mindestausstattung) und hier anpassbar.</p>
     </Section>
   )

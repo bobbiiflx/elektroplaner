@@ -1,4 +1,5 @@
 import { planPoint } from '../lib/runs'
+import { selectInRect } from '../lib/clip'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { findGap, type WallGap } from '../lib/gaps'
@@ -37,6 +38,7 @@ type Drag =
   | { kind: 'opening'; id: string }
   | { kind: 'wallEnd'; id: string; end: 'a' | 'b'; joined: WallEnd[] }
   | { kind: 'cableNode'; id: string; idx: number }
+  | { kind: 'marquee'; start: Vec2 }
   | { kind: 'shape'; what: ShapeKind; id: string; start: Vec2; a0: Vec2; b0: Vec2 }
   | { kind: 'shapePt'; what: ShapeKind; id: string; pt: 'a' | 'b' | 'depth' }
 
@@ -96,6 +98,9 @@ export default function Editor2D() {
 
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [view, setView] = useState<View>({ tx: 40, ty: 40, s: 0.1 })
+  const multi = useStore((s) => s.multi)
+  const setMulti = useStore((s) => s.setMulti)
+  const [marquee, setMarquee] = useState<{ a: Vec2; b: Vec2 } | null>(null)
   const [cursor, setCursor] = useState<Vec2 | null>(null)
   const [panning, setPanning] = useState(false)
   const [draft, setDraft] = useState<{ first: Vec2; last: Vec2 } | null>(null)
@@ -601,7 +606,11 @@ export default function Editor2D() {
     switch (tool) {
       case 'select':
         select(null)
-        startPan(e)
+        if (e.shiftKey) {
+          dragRef.current = { kind: 'marquee', start: raw }
+          setMarquee({ a: raw, b: raw })
+          svgRef.current?.setPointerCapture(e.pointerId)
+        } else startPan(e)
         break
       case 'wall': {
         const { p } = snap(raw, draft?.last, orthoNow)
@@ -650,6 +659,10 @@ export default function Editor2D() {
     if (!d) return
     if (d.kind === 'pan') {
       setView((v) => ({ ...v, tx: d.tx0 + (e.clientX - d.sx), ty: d.ty0 + (e.clientY - d.sy) }))
+      return
+    }
+    if (d.kind === 'marquee') {
+      setMarquee({ a: d.start, b: raw })
       return
     }
     if (d.kind === 'device') {
@@ -737,6 +750,11 @@ export default function Editor2D() {
   }
 
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (dragRef.current?.kind === 'marquee' && marquee) {
+      const r = { x0: Math.min(marquee.a.x, marquee.b.x), y0: Math.min(marquee.a.y, marquee.b.y), x1: Math.max(marquee.a.x, marquee.b.x), y1: Math.max(marquee.a.y, marquee.b.y) }
+      if (r.x1 - r.x0 > 80 || r.y1 - r.y0 > 80) setMulti(selectInRect(floor, r))
+      setMarquee(null)
+    }
     if (dragRef.current) {
       dragRef.current = null
       setPanning(false)
@@ -1030,6 +1048,37 @@ export default function Editor2D() {
               </g>
             )
           })}
+
+          {/* Mehrfachauswahl */}
+          {multi.length > 0 && (
+            <g style={{ pointerEvents: 'none' }} opacity={0.55}>
+              {multi.map((m) => {
+                if (m.kind === 'wall') {
+                  const w = floor.walls.find((x) => x.id === m.id)
+                  return w ? <line key={m.kind + m.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="var(--accent)" strokeWidth={w.thickness + px(6)} strokeLinecap="square" /> : null
+                }
+                if (m.kind === 'device') {
+                  const d = floor.devices.find((x) => x.id === m.id)
+                  const q = d ? planPoint(floor, d) : null
+                  return q ? <circle key={m.kind + m.id} cx={q.x} cy={q.y} r={px(11)} fill="none" stroke="var(--accent)" strokeWidth={px(3)} /> : null
+                }
+                if (m.kind === 'cable') {
+                  const c = floor.cables.find((x) => x.id === m.id)
+                  return c ? <polyline key={m.kind + m.id} points={c.points.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={px(6)} strokeLinejoin="round" /> : null
+                }
+                if (m.kind === 'roof') {
+                  const r = (floor.roofs ?? []).find((x) => x.id === m.id)
+                  return r ? <line key={m.kind + m.id} x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke="var(--accent)" strokeWidth={px(6)} /> : null
+                }
+                if (m.kind === 'dormer' || m.kind === 'loggia') {
+                  const r = (m.kind === 'dormer' ? floor.dormers : floor.loggias)?.find((x) => x.id === m.id)
+                  return r ? <polygon key={m.kind + m.id} points={rectCorners(r).map((q) => `${q.x},${q.y}`).join(' ')} fill="var(--accent)" fillOpacity={0.15} stroke="var(--accent)" strokeWidth={px(3)} /> : null
+                }
+                return null
+              })}
+            </g>
+          )}
+          {marquee && <rect x={Math.min(marquee.a.x, marquee.b.x)} y={Math.min(marquee.a.y, marquee.b.y)} width={Math.abs(marquee.b.x - marquee.a.x)} height={Math.abs(marquee.b.y - marquee.a.y)} fill="var(--accent)" fillOpacity={0.08} stroke="var(--accent)" strokeWidth={px(1.2)} strokeDasharray={`${px(5)} ${px(3)}`} style={{ pointerEvents: 'none' }} />}
 
           {/* Wände */}
           {floor.walls.map((w) => {

@@ -32,9 +32,62 @@ import { ElectricFields, ElectricOverview } from './ElectricPanel'
 import { GroupFields, GroupsOverview } from './GroupsPanel'
 import { DistOverview, RunFields } from './DistPanel'
 
+function MultiPanel() {
+  const multi = useStore((s) => s.multi)
+  const clip = useStore((s) => s.clip)
+  const floors = useStore((s) => s.project.floors)
+  const activeId = useStore((s) => s.activeFloorId)
+  const copySel = useStore((s) => s.copySel)
+  const pasteSel = useStore((s) => s.pasteSel)
+  const copyTo = useStore((s) => s.copyTo)
+  const deleteMulti = useStore((s) => s.deleteMulti)
+  const setMulti = useStore((s) => s.setMulti)
+  const n = (k: string) => multi.filter((m) => m.kind === k).length
+  const parts = [
+    [n('wall'), 'Wände'],
+    [n('opening'), 'Öffnungen'],
+    [n('device'), 'Geräte'],
+    [n('cable'), 'Leitungen'],
+    [n('roof') + n('dormer') + n('loggia'), 'Dach/Loggia'],
+  ]
+    .filter(([c]) => (c as number) > 0)
+    .map(([c, l]) => `${c} ${l}`)
+  return (
+    <Section title={`${multi.length} Elemente gewählt`}>
+      <p className="muted small">{parts.join(' · ') || '–'}</p>
+      <div className="btn-row">
+        <button className="btn" onClick={copySel}>Kopieren (Strg+C)</button>
+        <button className="btn" disabled={!clip} onClick={() => pasteSel()}>Einfügen (Strg+V)</button>
+      </div>
+      {floors.length > 1 && (
+        <Row label="Kopieren nach">
+          <select
+            className="text"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) copyTo(e.target.value)
+            }}
+          >
+            <option value="">Geschoss wählen …</option>
+            {floors.filter((f) => f.id !== activeId).map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </Row>
+      )}
+      <div className="btn-row">
+        <button className="btn danger" onClick={deleteMulti}>Löschen</button>
+        <button className="btn" onClick={() => setMulti([])}>Auswahl aufheben</button>
+      </div>
+      <p className="muted small">Auswahl: Umschalt gedrückt halten und im Plan einen Rahmen aufziehen. Wandmontierte Geräte und Öffnungen wandern mit ihren Wänden. Beim Einfügen im selben Geschoss um 50 cm versetzt.</p>
+    </Section>
+  )
+}
+
 export default function Inspector() {
   const floor = useFloor()
   const selection = useStore((s) => s.selection)
+  const multiCount = useStore((s) => s.multi.length)
   const deleteSelection = useStore((s) => s.deleteSelection)
 
   let body
@@ -64,6 +117,13 @@ export default function Inspector() {
     body = m ? <DimPanel dim={m} /> : null
   }
 
+  if (multiCount > 1 || (multiCount === 1 && !body))
+    return (
+      <div className="inspector-body">
+        <InspectorTabs />
+        <MultiPanel />
+      </div>
+    )
   if (!body) return <FloorPanel floor={floor} />
 
   const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia'

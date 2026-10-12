@@ -483,3 +483,23 @@ describe('Planprüfung', () => {
     expect(t2.some((x) => x.includes('FI') || x.includes('Summenleistung'))).toBe(false)
   })
 })
+
+import { collectClip, pasteClip, selectInRect, deleteSels } from './clip'
+describe('Mehrfachauswahl und Kopieren', () => {
+  it('Rahmen wählt Wände samt Öffnungen/Geräten; Einfügen vergibt neue IDs und bleibt konsistent', () => {
+    const p = sampleProject()
+    const f = p.floors[0]
+    const sels = selectInRect(f, { x0: -1e6, y0: -1e6, x1: 1e6, y1: 1e6 })
+    expect(sels.filter((s) => s.kind === 'wall').length).toBe(f.walls.length)
+    const clip = collectClip(f, sels)
+    const g = newFloor(p.settings, 'Zweites')
+    pasteClip(g, clip, { x: 0, y: 0 }, false)
+    expect(g.walls.length).toBe(f.walls.length)
+    expect(g.openings.length).toBe(f.openings.length)
+    expect(g.devices.length).toBe(f.devices.filter((d) => d.wallId).length + f.devices.filter((d) => !d.wallId).length)
+    expect(g.walls.every((w) => !f.walls.some((x) => x.id === w.id))).toBe(true)
+    expect(g.openings.every((o) => g.walls.some((w) => w.id === o.wallId))).toBe(true)
+    deleteSels(g, selectInRect(g, { x0: -1e6, y0: -1e6, x1: 1e6, y1: 1e6 }))
+    expect(g.walls.length + g.devices.length + g.cables.length).toBe(0)
+  })
+})

@@ -1,3 +1,4 @@
+import { collectClip, pasteClip, deleteSels, clipSize, type Clip, type Sel } from './lib/clip'
 import { create } from 'zustand'
 import { produce, type Draft } from 'immer'
 import type {
@@ -105,6 +106,13 @@ interface State {
   setTool: (t: Tool) => void
   restoreSnapshot: (at: string) => Promise<void>
   select: (s: Selection | null) => void
+  multi: Sel[]
+  clip: Clip | null
+  setMulti: (m: Sel[]) => void
+  copySel: () => void
+  pasteSel: (floorId?: string) => void
+  copyTo: (floorId: string) => void
+  deleteMulti: () => void
   setOpts: (o: Partial<ToolOptions>) => void
   setUnit: (u: Unit) => void
   setViewMode: (v: ViewMode) => void
@@ -290,7 +298,54 @@ export const useStore = create<State>((set, get) => ({
       // Bau-Werkzeuge → Bau-Tab, Elektro-Werkzeuge → Elektro-Tab
       inspectorTab: BUILD_TOOLS.includes(t) ? 'floor' : (t === 'device' || t === 'cable') && st.inspectorTab === 'floor' ? 'electric' : st.inspectorTab,
     })),
-  select: (selection) => set({ selection }),
+  select: (selection) => set({ selection, multi: [] }),
+  multi: [],
+  clip: null,
+  setMulti: (multi) => set({ multi, selection: multi.length === 1 ? multi[0] : null }),
+  copySel: () => {
+    const { multi, selection, project, activeFloorId } = get()
+    const sels = multi.length ? multi : selection ? [selection] : []
+    const f = project.floors.find((x) => x.id === activeFloorId)
+    if (!f || !sels.length) return
+    const clip = { ...collectClip(f, sels), from: f.id }
+    set({ clip })
+    get().showToast(`${clipSize(clip)} Element(e) kopiert`)
+  },
+  pasteSel: (floorId) => {
+    const { clip, activeFloorId } = get()
+    if (!clip) return
+    const target = floorId ?? activeFloorId
+    const same = clip.from === target
+    let made: Sel[] = []
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === target)
+      if (f) made = pasteClip(f, clip, same ? { x: 500, y: 500 } : { x: 0, y: 0 }, same)
+    })
+    if (target !== activeFloorId) set({ activeFloorId: target })
+    set({ multi: made, selection: null })
+    get().showToast(`${made.length} Element(e) eingefügt`)
+  },
+  copyTo: (floorId) => {
+    get().copySel()
+    const { clip } = get()
+    if (!clip || floorId === clip.from) return
+    let made = 0
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === floorId)
+      if (f) made = pasteClip(f, clip, { x: 0, y: 0 }, false).length
+    })
+    const name = get().project.floors.find((f) => f.id === floorId)?.name ?? ''
+    get().showToast(`${made} Element(e) nach „${name}“ kopiert`)
+  },
+  deleteMulti: () => {
+    const { multi, activeFloorId } = get()
+    if (!multi.length) return
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === activeFloorId)
+      if (f) deleteSels(f, multi)
+    })
+    set({ multi: [], selection: null })
+  },
   setOpts: (o) => set((s) => ({ opts: { ...s.opts, ...o } })),
   setUnit: (unit) => set({ unit }),
   setViewMode: (viewMode) => set({ viewMode }),
@@ -448,7 +503,7 @@ export const useStore = create<State>((set, get) => ({
     await get().openProject(p.id)
   },
 
-  setActiveFloor: (id) => set({ activeFloorId: id, selection: null, planPane: 'plan', elevWallId: null }),
+  setActiveFloor: (id) => set({ activeFloorId: id, selection: null, multi: [], planPane: 'plan', elevWallId: null }),
 
   addFloor: () => {
     const { project } = get()

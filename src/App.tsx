@@ -44,8 +44,17 @@ export default function App() {
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         st.redo()
+      } else if (mod && e.key.toLowerCase() === 'c' && (st.selection || st.multi.length)) {
+        e.preventDefault()
+        st.copySel()
+      } else if (mod && e.key.toLowerCase() === 'v' && st.clip) {
+        e.preventDefault()
+        st.pasteSel()
       } else if (!mod && (e.key === 'Delete' || e.key === 'Backspace')) {
-        if (st.selection) {
+        if (st.multi.length) {
+          e.preventDefault()
+          st.deleteMulti()
+        } else if (st.selection) {
           e.preventDefault()
           st.deleteSelection()
         }

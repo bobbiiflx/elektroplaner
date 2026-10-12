@@ -1078,3 +1078,11 @@ p {
   .pv-pages { zoom: 1; padding: 0; gap: 0; display: block; overflow: visible }
   .pv-sheet { box-shadow: none; break-after: page; page-break-after: always }
 }
+
+/* ---- Maßauswahl (Serie / Größe / UP-Dose) -------------------------------- */
+.spec-field { display: inline-flex; align-items: center; gap: 6px }
+.spec-ctl { display: flex; gap: 6px; min-width: 0; flex: 1 }
+.spec-ctl select { max-width: 230px; flex: 1; min-width: 0 }
+.spec-ctl.pair .field-num { width: 92px; flex: none }
+.optbar .spec-ctl.pair .field-num { width: 84px }
+.spec-note { grid-column: 1 / -1; margin: 0 0 4px }

@@ -11,11 +11,11 @@ import type {
   WallKind,
 } from './types'
 import { newFloor, newProject, sampleProject } from './lib/factory'
-import { cableType } from './config/catalog'
+import { cableType, type DeviceSpec } from './config/catalog'
 import { uid } from './lib/geom'
 import * as storage from './lib/storage'
 
-export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'calibrate'
+export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'measure' | 'calibrate'
 export type ViewMode = 'split' | '2d' | '3d'
 
 export interface AskDialog {
@@ -29,7 +29,7 @@ export interface AskDialog {
 }
 
 export interface Selection {
-  kind: 'wall' | 'opening' | 'device' | 'cable'
+  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim'
   id: string
 }
 
@@ -40,6 +40,8 @@ export interface ToolOptions {
   cableTypeId: string
   cableZ: number
   ortho: boolean
+  snap: boolean // Lineal: am Raster / an Objektmitten einrasten
+  spec: DeviceSpec // gewählte Serie / Größe / Dose für neu gesetzte Geräte
 }
 
 interface State {
@@ -131,6 +133,8 @@ export const useStore = create<State>((set, get) => ({
     cableTypeId: 'nym-3x1.5',
     cableZ: 300,
     ortho: true,
+    snap: true,
+    spec: {},
   },
   unit: 'cm',
   viewMode: 'split',
@@ -363,6 +367,8 @@ export const useStore = create<State>((set, get) => ({
       } else if (selection.kind === 'device') {
         f.devices = f.devices.filter((d) => d.id !== selection.id)
         for (const c of f.cables) for (const n of c.points) if (n.deviceId === selection.id) delete n.deviceId
+      } else if (selection.kind === 'dim') {
+        f.dims = (f.dims ?? []).filter((d) => d.id !== selection.id)
       } else {
         f.cables = f.cables.filter((c) => c.id !== selection.id)
       }

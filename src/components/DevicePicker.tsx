@@ -56,7 +56,7 @@ export function DevicePicker() {
                     key={d.id}
                     className={'dev-card' + (opts.deviceTypeId === d.id ? ' on' : '')}
                     onClick={() => {
-                      setOpts({ deviceTypeId: d.id })
+                      setOpts({ deviceTypeId: d.id, spec: {} })
                       setPickerOpen(false)
                     }}
                     title={`${d.name} · Standardhöhe ${formatLen(d.defaultHeight, unit)}`}

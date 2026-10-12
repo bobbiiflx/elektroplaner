@@ -3,6 +3,7 @@ import { LenField } from './NumberField'
 import { CablePicker, CablePickerButton } from './CablePicker'
 import { DevicePicker, DevicePickerButton } from './DevicePicker'
 import { Segmented } from './ui'
+import { SpecFields, mergeSpec } from './SpecFields'
 
 interface Props {
   cableNodes: number
@@ -17,6 +18,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
   const tool = useStore((s) => s.tool)
   const opts = useStore((s) => s.opts)
   const setOpts = useStore((s) => s.setOpts)
+  const defaultSeries = useStore((s) => s.project.settings.seriesId)
   const pickerOpen = useStore((s) => s.pickerOpen)
   const hasBg = useStore((s) => {
     const f = s.project.floors.find((x) => x.id === s.activeFloorId) ?? s.project.floors[0]
@@ -56,7 +58,24 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         />
       )}
 
-      {tool === 'device' && <DevicePickerButton />}
+      {tool === 'device' && (
+        <>
+          <DevicePickerButton />
+          <SpecFields typeId={opts.deviceTypeId} spec={opts.spec} defaultSeriesId={defaultSeries} onChange={(patch) => setOpts({ spec: mergeSpec(opts.spec, patch) })} layout="bar" />
+        </>
+      )}
+
+      {tool === 'measure' && (
+        <>
+          <label className="check" title="Rastet am Raster, an Wand- und Öffnungspunkten und immer an der Mitte von Objekten ein">
+            <input type="checkbox" checked={opts.snap} onChange={(e) => setOpts({ snap: e.target.checked })} />
+            Einrasten
+          </label>
+          <span className="opt-text">
+            {opts.snap ? 'Raster · Objektmitten · Wandpunkte' : 'Frei – ohne Einrasten'} · Umschalt = waagerecht/senkrecht · Esc bricht ab
+          </span>
+        </>
+      )}
 
       {tool === 'cable' && (
         <>

@@ -47,6 +47,14 @@ export interface Device {
   offset: number // Abstand Wandanfang → Mitte des Geräts
   side: 1 | -1 // Seite der Wand (Normale = (-dy, dx))
   height: number // Mitte über OKFF
+  // Maße (optional): fehlt alles, gelten Projektstandard-Serie und Standarddose des Gerätetyps
+  seriesId?: string // Schalterserie (nur Typen mit Rahmen), 'custom' = eigene Maße w × h
+  sizeId?: string // Größenvariante bei Typen ohne Rahmen, 'custom' = eigene Maße w × h
+  w?: number // eigene Breite (mm)
+  h?: number // eigene Höhe (mm)
+  boxId?: string // Unterputzdose (Preset) oder 'custom'
+  boxDia?: number // eigener Dosendurchmesser (mm)
+  boxDepth?: number // eigene Dosentiefe (mm)
 }
 
 export type InstallMethod = 'A2' | 'B2' | 'C'
@@ -64,6 +72,15 @@ export interface Cable {
   charac: Characteristic
 }
 
+/** Vom Nutzer gezeichnete Maßlinie. space 'plan': x/y im Grundriss; 'wall': x = Abstand vom Wandanfang (u), y = Höhe über OKFF. */
+export interface Dimension {
+  id: string
+  space: 'plan' | 'wall'
+  wallId?: string
+  a: Vec2
+  b: Vec2
+}
+
 export interface Floor {
   id: string
   name: string
@@ -74,6 +91,7 @@ export interface Floor {
   openings: Opening[]
   devices: Device[]
   cables: Cable[]
+  dims?: Dimension[]
 }
 
 export interface HorizontalZone {
@@ -103,6 +121,7 @@ export interface ProjectSettings {
   innerThickness: number
   levelHeight: number
   grid: number
+  seriesId?: string // Standard-Schalterserie für neue und nicht abweichende Geräte
   zones: ZoneSettings
   vde: VdeSettings
 }

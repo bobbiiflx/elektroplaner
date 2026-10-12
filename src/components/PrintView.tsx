@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { METHOD_LABEL, cableType, deviceType, type DeviceType } from '../config/catalog'
+import { METHOD_LABEL, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
-import type { Cable, Device, Floor, Wall, ZoneSettings } from '../types'
+import type { Cable, Device, Floor, ProjectSettings, Wall, ZoneSettings } from '../types'
 import { boundsOf, cableLengths, clamp, projectOnWall, wallAngleDeg, wallLength } from '../lib/geom'
 import { formatLen } from '../lib/units'
 import { horizontalBands, verticalSpans } from '../lib/zones'
 import { DeviceFace, PlanSymbolShape } from './DeviceIcons'
-import { ElevationDims, PlanDims } from './dims'
+import { ElevationDims, FreeDim, PlanDims } from './dims'
 import { Segmented } from './ui'
 
 type Paper = 'A4' | 'A3'
@@ -183,6 +183,10 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
           )
         })}
         {opts.dims && <PlanDims floor={floor} unit={unit} px={px} color="#0a4a9a" />}
+        {opts.dims &&
+          (floor.dims ?? [])
+            .filter((m) => m.space === 'plan')
+            .map((m) => <FreeDim key={m.id} a={m.a} b={m.b} text={formatLen(Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y), unit)} px={px} color="#0a4a9a" />)}
         {floor.walls.map((w, i) => {
           const L = wallLength(w)
           if (L < 300) return null
@@ -234,7 +238,7 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
   )
 }
 
-function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH, zones }: { floor: Floor; wall: Wall; wi: number; side: 1 | -1; rows: Row[]; first: boolean; opts: Opts; unit: 'mm' | 'cm' | 'm'; areaW: number; areaH: number; zones: ZoneSettings }) {
+function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH, zones, settings }: { floor: Floor; wall: Wall; wi: number; side: 1 | -1; rows: Row[]; first: boolean; opts: Opts; unit: 'mm' | 'cm' | 'm'; areaW: number; areaH: number; zones: ZoneSettings; settings: ProjectSettings }) {
   const L = wallLength(wall)
   const H = wall.height ?? floor.wallHeight
   const { mL, mR, mT, mB } = WALL_M
@@ -299,7 +303,7 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
             <polyline key={r.cable.id + i} points={r.pts.map((p) => `${X(p.u)},${-p.z}`).join(' ')} fill="none" stroke={cableType(r.cable.typeId).color} strokeWidth={px(1.6)} strokeLinejoin="round" strokeLinecap="round" />
           ))}
           {[...back, ...front].map((d) => {
-            const dt = deviceType(d.typeId)
+            const dt = devType(d, settings)
             const k = kOf(dt)
             const isFront = d.side === side
             return (
@@ -309,7 +313,7 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
             )
           })}
           {front.map((d, i) => {
-            const dt = deviceType(d.typeId)
+            const dt = devType(d, settings)
             const y = -d.height - (dt.h * kOf(dt)) / 2 - px(6)
             return (
               <g key={'n' + d.id}>
@@ -320,7 +324,13 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
               </g>
             )
           })}
-          {opts.dims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} color="#0a4a9a" />}
+          {opts.dims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} color="#0a4a9a" />}
+          {opts.dims &&
+            (floor.dims ?? [])
+              .filter((m) => m.space === 'wall' && m.wallId === wall.id)
+              .map((m) => (
+                <FreeDim key={m.id} a={{ x: X(m.a.x), y: -m.a.y }} b={{ x: X(m.b.x), y: -m.b.y }} text={formatLen(Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y), unit)} px={px} color="#0a4a9a" />
+              ))}
         </svg>
       )}
       <table className="pv-table">
@@ -422,13 +432,13 @@ export default function PrintView() {
         for (const side of sides) {
           const front = devs.filter((d) => d.side === side).sort((a, b) => (side === 1 ? a.offset - b.offset : b.offset - a.offset))
           const rows: Row[] = front.map((d, i) => {
-            const dt = deviceType(d.typeId)
+            const rd = resolveDevice(d, project.settings)
             const fromLeft = side === 1 ? d.offset : L - d.offset
             return {
               nr: String(i + 1),
               pos: `${formatLen(fromLeft, unit)} von links`,
               size: `H ${formatLen(d.height, unit)}`,
-              detail: dt.name,
+              detail: `${rd.dt.name} · ${Math.round(rd.dt.w * 10) / 10} × ${Math.round(rd.dt.h * 10) / 10} mm${rd.box ? ` · ${rd.box.count > 1 ? rd.box.count + '× ' : ''}Dose Ø${rd.box.dia}×${rd.box.depth}` : ''}`,
               checks: ['Dose gesetzt', 'Gerät montiert', 'Funktion geprüft'],
             }
           })
@@ -472,7 +482,7 @@ export default function PrintView() {
       chunk(rows, capN, capN).forEach((rs, part) => out.push({ kind: 'cables', rows: rs, part }))
     }
     return out
-  }, [floor, opts.plan, opts.walls, opts.list, areaH, unit])
+  }, [floor, project.settings, opts.plan, opts.walls, opts.list, areaH, unit])
 
   const set = (o: Partial<Opts>) => setOpts((v) => ({ ...v, ...o }))
   const tog = (k: 'plan' | 'walls' | 'list' | 'zones' | 'dims', label: string) => (
@@ -513,7 +523,7 @@ export default function PrintView() {
           if (p.kind === 'wall')
             return (
               <Sheet key={i} {...common} scale={p.first ? wallScale(wallLength(p.wall), p.wall.height ?? floor.wallHeight, areaW, areaH * 0.6) : undefined} title={`Wand ${p.wi + 1} · Seite ${p.side === 1 ? 1 : 2} · ${formatLen(wallLength(p.wall), unit)}${p.part ? ' (Forts.)' : ''}`}>
-                <WallPage floor={floor} wall={p.wall} wi={p.wi} side={p.side} rows={p.rows} first={p.first} opts={opts} unit={unit} areaW={areaW} areaH={areaH} zones={zones} />
+                <WallPage floor={floor} wall={p.wall} wi={p.wi} side={p.side} rows={p.rows} first={p.first} opts={opts} unit={unit} areaW={areaW} areaH={areaH} zones={zones} settings={project.settings} />
               </Sheet>
             )
           return (

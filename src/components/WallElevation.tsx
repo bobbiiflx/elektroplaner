@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, type DeviceType } from '../config/catalog'
+import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Wall } from '../types'
 import { clamp, pointOnWall, projectOnWall, uid, wallLength } from '../lib/geom'
 import { routeTo } from '../lib/cableRoute'
+import { autoRef, lockAxis, snapWallPoint, type AutoRef } from '../lib/autoDims'
 import { syncDeviceNodes } from '../lib/link'
 import { horizontalBands, verticalSpans } from '../lib/zones'
 import { formatLen } from '../lib/units'
 import { DeviceFace } from './DeviceIcons'
-import { ElevationDims } from './dims'
+import { ElevationDims, FreeDim } from './dims'
 import { PaneSwitch } from './PaneSwitch'
 import { ToolOptionsBar } from './ToolOptionsBar'
 
@@ -33,6 +34,7 @@ const HINTS: Record<string, string> = {
   opening: 'Auf die Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
   device: 'Auf die Wand klicken, um das Gerät zu setzen · rastet an Zonen und anderen Geräten ein',
   cable: 'Klicken setzt Leitungspunkte – nur waagerecht oder senkrecht · rastet an Dosen/Schaltern ein · Enter beendet',
+  measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
   calibrate: 'Der Maßstab wird im Grundriss kalibriert',
 }
 
@@ -69,6 +71,8 @@ export default function WallElevation() {
   const [panning, setPanning] = useState(false)
   const [cursor, setCursor] = useState<{ u: number; z: number } | null>(null)
   const [draft, setDraft] = useState<CableNode[]>([])
+  const [measureA, setMeasureA] = useState<{ x: number; y: number } | null>(null)
+  const [shiftDown, setShiftDown] = useState(false)
 
   const settings = project.settings
   const wall: Wall | undefined = floor.walls.find((w) => w.id === wallId)
@@ -213,7 +217,7 @@ export default function WallElevation() {
     const tol = 14 / s
     let best: { id: string; d: number } | null = null
     for (const d of devicesHere) {
-      const dt = deviceType(d.typeId)
+      const dt = devType(d, settings)
       const k = kOf(dt)
       const dx = Math.max(0, Math.abs(rawU - d.offset) - (dt.w * k) / 2)
       const dz = Math.max(0, Math.abs(rawZ - d.height) - (dt.h * k) / 2)
@@ -260,14 +264,41 @@ export default function WallElevation() {
 
   const placeDevice = (rawU: number, rawZ: number) => {
     if (!wall) return
-    const dt = deviceType(opts.deviceTypeId)
+    const dt = resolveSpec(opts.deviceTypeId, opts.spec, settings.seriesId).dt
     const r = snapFree(rawU, rawZ)
     const id = uid('d_')
     edit((p) => {
       const f = p.floors.find((x) => x.id === floor.id)
-      f?.devices.push({ id, typeId: dt.id, wallId: wall.id, offset: r.u, side, height: r.z })
+      f?.devices.push({ id, typeId: dt.id, wallId: wall.id, offset: r.u, side, height: r.z, ...opts.spec })
     })
     select({ kind: 'device', id })
+  }
+
+  /** Punkt des Lineals (u, z): rastet – wenn aktiv – an Objektmitten, Öffnungs-/Wandecken oder am Raster ein. */
+  const measurePoint = (rawU: number, rawZ: number, shift: boolean) => {
+    if (!wall) return { p: { x: rawU, y: rawZ }, kind: 'free' as const }
+    const snapped = snapWallPoint(wall, H, devicesHere, openingsHere, { x: rawU, y: rawZ }, 14 / s, settings.grid, opts.snap)
+    if (shift && measureA) return { ...snapped, p: lockAxis(measureA, opts.snap ? snapped.p : { x: clamp(rawU, 0, L), y: clamp(rawZ, 0, H) }) }
+    return snapped
+  }
+
+  const addMeasurePoint = (rawU: number, rawZ: number, shift: boolean) => {
+    if (!wall) return
+    const { p } = measurePoint(rawU, rawZ, shift)
+    if (!measureA) {
+      setMeasureA(p)
+      return
+    }
+    if (Math.hypot(p.x - measureA.x, p.y - measureA.y) < 1) return
+    const id = uid('m_')
+    const a = measureA
+    edit((pr) => {
+      const f = pr.floors.find((x) => x.id === floor.id)
+      if (!f) return
+      f.dims = f.dims ?? []
+      f.dims.push({ id, space: 'wall', wallId: wall.id, a, b: p })
+    })
+    setMeasureA(null)
   }
 
   const placeOpening = (rawU: number) => {
@@ -306,6 +337,7 @@ export default function WallElevation() {
         const st = useStore.getState()
         if (st.pickerOpen) st.setPickerOpen(false)
         else if (draft.length) setDraft([])
+        else if (measureA) setMeasureA(null)
         else setTool('select')
       } else if (e.key === 'Enter') {
         if (tool === 'cable') finishCable()
@@ -322,9 +354,12 @@ export default function WallElevation() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [draft, tool, finishCable, fit, setTool])
+  }, [draft, measureA, tool, finishCable, fit, setTool])
 
-  useEffect(() => setDraft([]), [tool, floor.id, wallId, side])
+  useEffect(() => {
+    setDraft([])
+    setMeasureA(null)
+  }, [tool, floor.id, wallId, side])
 
   // --- Zeiger ---------------------------------------------------------------
   const startPan = (e: React.PointerEvent) => {
@@ -355,6 +390,9 @@ export default function WallElevation() {
       case 'cable':
         if (inside) addCablePoint(u, z)
         break
+      case 'measure':
+        if (inside) addMeasurePoint(u, z, e.shiftKey)
+        break
       default:
         showToast('Dieses Werkzeug gibt es nur im Grundriss.')
     }
@@ -363,6 +401,7 @@ export default function WallElevation() {
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const raw = toWall(e.clientX, e.clientY)
     setCursor(raw)
+    if (e.shiftKey !== shiftDown) setShiftDown(e.shiftKey)
     const d = dragRef.current
     if (!d) return
     if (d.kind === 'pan') {
@@ -408,7 +447,7 @@ export default function WallElevation() {
     if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel: { kind: 'opening' | 'device' | 'cable'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel: { kind: 'opening' | 'device' | 'cable' | 'dim'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     select(sel)
@@ -452,6 +491,25 @@ export default function WallElevation() {
           </>
         )}
         {label(text, (x1 + x2) / 2 + textDx, (y1 + y2) / 2 + textDy, 'var(--accent)')}
+      </g>
+    )
+  }
+
+  /** Mittenbemaßung eines Objekts: Höhe ab OKFF + waagerecht zur nächsten Wandkante – bzw. nur zur Mitte eines Objekts auf gleicher Höhe. */
+  const autoDimsFor = (u: number, z: number, dt: DeviceType, ignoreId?: string) => {
+    if (!wall) return null
+    const k = kOf(dt)
+    const cx = X(u)
+    const cy = -z
+    const ref: AutoRef = autoRef(wall, devicesHere, u, z, ignoreId)
+    const rx = X(ref.u)
+    const xr = cx + (dt.w * k) / 2 + px(22)
+    return (
+      <g>
+        {dim(xr, 0, xr, cy, formatLen(z, unit), px(38), 0)}
+        {Math.abs(cx - rx) > 1 && dim(rx, cy, cx, cy, formatLen(Math.abs(cx - rx), unit), 0, -px(12))}
+        {ref.kind === 'device' && <circle cx={rx} cy={cy} r={px(3)} fill="var(--accent)" />}
+        <circle cx={cx} cy={cy} r={px(3)} fill="var(--accent)" />
       </g>
     )
   }
@@ -634,7 +692,7 @@ export default function WallElevation() {
 
           {/* Geräte (Rückseite blass) */}
           {[...devicesHere].sort((a, b) => Number(sideDevice(a)) - Number(sideDevice(b))).map((d) => {
-            const dt = deviceType(d.typeId)
+            const dt = devType(d, settings)
             const sel = selection?.kind === 'device' && selection.id === d.id
             const front = sideDevice(d)
             const k = kOf(dt)
@@ -659,20 +717,44 @@ export default function WallElevation() {
             )
           })}
 
-          {showDims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} />}
+          {showDims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} />}
+
+          {/* Selbst gezeichnete Maßlinien */}
+          {(floor.dims ?? [])
+            .filter((m) => m.space === 'wall' && m.wallId === wall.id)
+            .map((m) => (
+              <FreeDim
+                key={m.id}
+                a={{ x: X(m.a.x), y: -m.a.y }}
+                b={{ x: X(m.b.x), y: -m.b.y }}
+                text={formatLen(Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y), unit)}
+                px={px}
+                selected={selection?.kind === 'dim' && selection.id === m.id}
+                onPointerDown={tool === 'select' ? (e) => beginElementDrag(e, null, { kind: 'dim', id: m.id }) : undefined}
+              />
+            ))}
+          {tool === 'measure' && cursor && (() => {
+            const r = measurePoint(cursor.u, cursor.z, shiftDown)
+            const P = (q: { x: number; y: number }) => ({ x: X(q.x), y: -q.y })
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                {measureA && <FreeDim a={P(measureA)} b={P(r.p)} text={formatLen(Math.hypot(r.p.x - measureA.x, r.p.y - measureA.y), unit)} px={px} color="var(--accent)" ghost />}
+                {measureA && <circle cx={P(measureA).x} cy={P(measureA).y} r={px(4)} fill="var(--accent)" />}
+                <circle cx={P(r.p).x} cy={P(r.p).y} r={px(r.kind === 'device' ? 8 : 5)} fill={r.kind === 'device' ? 'none' : 'var(--accent)'} stroke="var(--accent)" strokeWidth={px(2)} />
+                {r.kind === 'device' && label('Mitte', P(r.p).x, P(r.p).y - px(16), 'var(--accent)')}
+              </g>
+            )
+          })()}
 
           {/* Maße des gewählten Geräts */}
           {selDevice && (() => {
             const cx = X(selDevice.offset)
             const y = -selDevice.height
-            const dt = deviceType(selDevice.typeId)
+            const dt = devType(selDevice, settings)
             const k = kOf(dt)
-            const yMeasure = y + (dt.h * k) / 2 + px(26)
             return (
               <g>
-                {dim(cx + (dt.w * k) / 2 + px(22), 0, cx + (dt.w * k) / 2 + px(22), y, formatLen(selDevice.height, unit), px(38), 0)}
-                {dim(0, yMeasure, cx, yMeasure, formatLen(side === 1 ? selDevice.offset : L - selDevice.offset, unit), 0, px(12))}
-                {dim(cx, yMeasure, L, yMeasure, formatLen(side === 1 ? L - selDevice.offset : selDevice.offset, unit), 0, px(12))}
+                {autoDimsFor(selDevice.offset, selDevice.height, dt, selDevice.id)}
                 {label(`${dt.name}${selDevice.side === side ? '' : ' (Rückseite)'}`, cx, y - (dt.h * k) / 2 - px(18), 'var(--accent)')}
               </g>
             )
@@ -681,7 +763,7 @@ export default function WallElevation() {
 
           {/* Platzierungs-Vorschau */}
           {ghostDev && (() => {
-            const dt = deviceType(opts.deviceTypeId)
+            const dt = resolveSpec(opts.deviceTypeId, opts.spec, settings.seriesId).dt
             const k = kOf(dt)
             const cx = X(ghostDev.u)
             const cy = -ghostDev.z
@@ -690,8 +772,7 @@ export default function WallElevation() {
                 <g transform={`translate(${cx} ${cy}) scale(${k})`} opacity={0.65}>
                   <DeviceFace dt={dt} />
                 </g>
-                {dim(cx + (dt.w * k) / 2 + px(22), 0, cx + (dt.w * k) / 2 + px(22), cy, formatLen(ghostDev.z, unit), px(38), 0)}
-                {dim(0, cy + (dt.h * k) / 2 + px(26), cx, cy + (dt.h * k) / 2 + px(26), formatLen(side === 1 ? ghostDev.u : L - ghostDev.u, unit), 0, px(12))}
+                {autoDimsFor(ghostDev.u, ghostDev.z, dt)}
               </g>
             )
           })()}

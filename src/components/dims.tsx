@@ -1,5 +1,5 @@
-import type { Floor, Opening, Wall, Device } from '../types'
-import { cableType, deviceType, type DeviceType } from '../config/catalog'
+import type { Floor, Opening, Wall, Device, Vec2 } from '../types'
+import { cableType, type DeviceType, type ResolvedDevice } from '../config/catalog'
 import { cableLengths, dist, wallAngleDeg, wallLength } from '../lib/geom'
 import { formatLen } from '../lib/units'
 import type { Unit } from '../types'
@@ -143,7 +143,7 @@ export function PlanDims({ floor, unit, px, color = DIM_COLOR, cables = true }: 
 }
 
 /** Maßketten, Höhenkoten und Öffnungsmaße der Wandansicht. */
-export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf, color = DIM_COLOR }: {
+export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf, typeOf, color = DIM_COLOR }: {
   wall: Wall
   H: number
   side: 1 | -1
@@ -152,6 +152,7 @@ export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf,
   unit: Unit
   px: PxFn
   kOf: (dt: DeviceType) => number
+  typeOf: (d: Device) => ResolvedDevice
   color?: string
 }) {
   const L = wallLength(wall)
@@ -173,7 +174,7 @@ export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf,
   // Höhenkoten (links)
   const heights: { z: number; x: number }[] = []
   for (const d of front) {
-    const dt = deviceType(d.typeId)
+    const dt = typeOf(d).dt
     const hk = Math.round(d.height)
     const x = X(d.offset) - (dt.w * kOf(dt)) / 2
     const ex = heights.find((h) => Math.abs(h.z - hk) < 5)
@@ -188,6 +189,18 @@ export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf,
         return <Dim key={i} x1={a} y1={yChain} x2={b} y2={yChain} text={formatLen(b - a, unit, false)} px={px} color={color} showText={(b - a) * k > 34} />
       })}
       <Dim x1={0} y1={yTotal} x2={L} y2={yTotal} text={formatLen(L, unit)} px={px} color={color} />
+
+      {front.map((d) => {
+        const box = typeOf(d).box
+        if (!box) return null
+        return (
+          <g key={'box' + d.id} fill="none" stroke={color} strokeWidth={px(0.8)} strokeDasharray={`${px(3)} ${px(2.5)}`} opacity={0.75}>
+            {Array.from({ length: box.count }, (_, i) => (
+              <circle key={i} cx={X(d.offset) + (i - (box.count - 1) / 2) * box.pitch} cy={-d.height} r={box.dia / 2} />
+            ))}
+          </g>
+        )
+      })}
 
       {heights.map((h) => (
         <g key={h.z}>
@@ -207,6 +220,43 @@ export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf,
           </g>
         )
       })}
+    </g>
+  )
+}
+
+/** Frei gezeichnete Maßlinie zwischen zwei Punkten (beliebige Richtung) mit Endstrichen, Länge als Text. */
+export function FreeDim({ a, b, text, px, color = DIM_COLOR, selected = false, ghost = false, onPointerDown }: {
+  a: Vec2
+  b: Vec2
+  text: string
+  px: PxFn
+  color?: string
+  selected?: boolean
+  ghost?: boolean
+  onPointerDown?: (e: React.PointerEvent) => void
+}) {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len
+  const uy = dy / len
+  const nx = -uy
+  const ny = ux
+  const t = px(5)
+  const ang = (Math.atan2(dy, dx) * 180) / Math.PI
+  const flip = ang > 90 || ang < -90
+  const mx = (a.x + b.x) / 2 + nx * px(11) * (flip ? -1 : 1)
+  const my = (a.y + b.y) / 2 + ny * px(11) * (flip ? -1 : 1)
+  const col = selected ? 'var(--accent)' : color
+  return (
+    <g fill="none" stroke={col} strokeWidth={px(selected ? 2 : 1.2)} opacity={ghost ? 0.8 : 1} strokeDasharray={ghost ? `${px(5)} ${px(3)}` : undefined}>
+      {onPointerDown && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={px(14)} style={{ cursor: 'pointer' }} onPointerDown={onPointerDown} />}
+      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ pointerEvents: 'none' }} />
+      <g style={{ pointerEvents: 'none' }} strokeDasharray="none">
+        <line x1={a.x - nx * t} y1={a.y - ny * t} x2={a.x + nx * t} y2={a.y + ny * t} />
+        <line x1={b.x - nx * t} y1={b.y - ny * t} x2={b.x + nx * t} y2={b.y + ny * t} />
+      </g>
+      <Txt text={text} x={mx} y={my} px={px} color={col} rotate={ang} flip={flip} />
     </g>
   )
 }

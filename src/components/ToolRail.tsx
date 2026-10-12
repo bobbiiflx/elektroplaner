@@ -1,4 +1,4 @@
-import { BrickWall, Cable, DoorOpen, MousePointer2, Plug, Ruler } from 'lucide-react'
+import { BrickWall, Cable, DoorOpen, MousePointer2, Plug, Ruler, Scaling } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useStore, type Tool } from '../store'
 
@@ -8,7 +8,8 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: ReactNode }[] 
   { id: 'opening', label: 'Tür / Fenster', key: 'O', icon: <DoorOpen size={19} /> },
   { id: 'device', label: 'Steckdose / Schalter / Dose', key: 'D', icon: <Plug size={19} /> },
   { id: 'cable', label: 'Leitung verlegen', key: 'C', icon: <Cable size={19} /> },
-  { id: 'calibrate', label: 'Maßstab kalibrieren', key: 'K', icon: <Ruler size={19} /> },
+  { id: 'measure', label: 'Lineal – Maße zeichnen', key: 'M', icon: <Ruler size={19} /> },
+  { id: 'calibrate', label: 'Maßstab kalibrieren', key: 'K', icon: <Scaling size={19} /> },
 ]
 
 export default function ToolRail() {

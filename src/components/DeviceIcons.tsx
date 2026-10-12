@@ -111,8 +111,22 @@ function Port({ cy = 0, w = 38, h = 26, color }: { cy?: number; w?: number; h?: 
   )
 }
 
-/** Maßstäbliche Frontplatte eines Geräts, Mittelpunkt im Ursprung, Einheit mm. */
+/**
+ * Maßstäbliche Frontplatte eines Geräts, Mittelpunkt im Ursprung, Einheit mm.
+ * Weichen die Maße (Serie, Größenvariante, eigene Maße) vom Katalogwert ab, wird die Zeichnung gleichmäßig skaliert.
+ */
 export function DeviceFace({ dt }: { dt: DeviceType }) {
+  const base = deviceType(dt.id)
+  if (Math.abs(dt.w - base.w) < 0.05 && Math.abs(dt.h - base.h) < 0.05) return <DeviceFaceBase dt={dt} />
+  const k = Math.min(dt.w / base.w, dt.h / base.h)
+  return (
+    <g transform={`scale(${k})`}>
+      <DeviceFaceBase dt={base} />
+    </g>
+  )
+}
+
+function DeviceFaceBase({ dt }: { dt: DeviceType }) {
   const { w, h } = dt
   switch (dt.id) {
     case 'sd-1':

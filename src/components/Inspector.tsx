@@ -8,6 +8,7 @@ import {
   METHOD_LABEL,
   cableType,
   deviceType,
+  resolveDevice,
   type DeviceCategory,
 } from '../config/catalog'
 import { cableLengths, clamp, wallLength } from '../lib/geom'
@@ -17,9 +18,10 @@ import { formatLen } from '../lib/units'
 import { evaluate } from '../lib/vde'
 import { checkCable, checkDevice } from '../lib/zones'
 import { useFloor, useStore } from '../store'
-import type { Cable, Device, Floor, InstallMethod, Opening, Wall } from '../types'
+import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } from '../types'
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
+import { SpecFields } from './SpecFields'
 
 export default function Inspector() {
   const floor = useFloor()
@@ -39,6 +41,9 @@ export default function Inspector() {
   } else if (selection?.kind === 'cable') {
     const c = floor.cables.find((x) => x.id === selection.id)
     body = c ? <CablePanel cable={c} floor={floor} /> : null
+  } else if (selection?.kind === 'dim') {
+    const m = (floor.dims ?? []).find((x) => x.id === selection.id)
+    body = m ? <DimPanel dim={m} /> : null
   }
 
   if (!body) return <FloorPanel floor={floor} />
@@ -179,7 +184,9 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
   const editFloor = useEditFloor()
   const zones = useStore((s) => s.project.settings.zones)
   const unit = useStore((s) => s.unit)
-  const dt = deviceType(device.typeId)
+  const settings = useStore((s) => s.project.settings)
+  const resolved = resolveDevice(device, settings)
+  const dt = resolved.dt
   const wall = floor.walls.find((w) => w.id === device.wallId)
   const L = wall ? wallLength(wall) : 0
   const wallH = wall?.height ?? floor.wallHeight
@@ -211,7 +218,19 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
     <>
       <Section title="Gerät">
         <Row label="Typ">
-          <select value={device.typeId} onChange={(e) => upd((d) => void (d.typeId = e.target.value))}>
+          <select value={device.typeId} onChange={(e) =>
+              upd((d) => {
+                d.typeId = e.target.value
+                delete d.seriesId
+                delete d.sizeId
+                delete d.w
+                delete d.h
+                delete d.boxId
+                delete d.boxDia
+                delete d.boxDepth
+              })
+            }
+          >
             {groups.map((g) => (
               <optgroup key={g.cat} label={CATEGORY_LABEL[g.cat]}>
                 {g.items.map((t) => (
@@ -242,6 +261,20 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
             ]}
           />
         </Row>
+        <SpecFields
+          typeId={device.typeId}
+          spec={device}
+          defaultSeriesId={settings.seriesId}
+          layout="panel"
+          onChange={(patch) =>
+            upd((d) => {
+              for (const [k, v] of Object.entries(patch)) {
+                if (v === undefined) delete (d as unknown as Record<string, unknown>)[k]
+                else (d as unknown as Record<string, unknown>)[k] = v
+              }
+            }, key('spec'))
+          }
+        />
         {nearestOpening && (
           <p className="muted small">
             Nächste Öffnung ({nearestOpening.type}): {formatLen(nearestOpening.d, unit)}
@@ -259,10 +292,29 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
           </p>
         )}
         <p className="muted small">
-          {dt.name} · Dose {formatLen(dt.w, 'mm')} × {formatLen(dt.h, 'mm')}
+          {dt.name} · Platte {formatLen(dt.w, 'mm')} × {formatLen(dt.h, 'mm')}
         </p>
       </Section>
     </>
+  )
+}
+
+function DimPanel({ dim }: { dim: Dimension }) {
+  const unit = useStore((s) => s.unit)
+  const dx = Math.abs(dim.b.x - dim.a.x)
+  const dy = Math.abs(dim.b.y - dim.a.y)
+  return (
+    <Section title="Maßlinie">
+      <Row label="Länge">
+        <b>{formatLen(Math.hypot(dx, dy), unit)}</b>
+      </Row>
+      <Row label={dim.space === 'plan' ? 'Δ x / Δ y' : 'Δ Breite / Δ Höhe'}>
+        <span className="muted">
+          {formatLen(dx, unit, false)} / {formatLen(dy, unit)}
+        </span>
+      </Row>
+      <p className="muted small">{dim.space === 'plan' ? 'Gezeichnet im Grundriss.' : 'Gezeichnet in der Wandansicht.'}</p>
+    </Section>
   )
 }
 

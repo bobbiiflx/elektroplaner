@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { DEFAULT_SETTINGS } from '../config/catalog'
+import { DEFAULT_SERIES_ID, DEFAULT_SETTINGS, SERIES } from '../config/catalog'
 import { uid } from '../lib/geom'
 import { useStore } from '../store'
 import type { ProjectSettings } from '../types'
@@ -40,6 +40,15 @@ export default function SettingsDialog() {
         </Row>
         <Row label="Innenwand">
           <LenField mm={settings.innerThickness} min={20} onCommit={(v) => upd((s) => void (s.innerThickness = v), 'set:it')} />
+        </Row>
+        <Row label="Schalterserie" hint="Rahmenmaße">
+          <select value={settings.seriesId ?? DEFAULT_SERIES_ID} onChange={(e) => upd((s) => void (s.seriesId = e.target.value), 'set:series')}>
+            {SERIES.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
         </Row>
         <Row label="Raster" hint="Einrasten beim Zeichnen">
           <LenField mm={settings.grid} min={1} onCommit={(v) => upd((s) => void (s.grid = v), 'set:grid')} />

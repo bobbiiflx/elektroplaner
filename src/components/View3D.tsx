@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { Canvas, useThree } from '@react-three/fiber'
 import { Line, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { cableType, deviceType } from '../config/catalog'
+import { cableType, devType } from '../config/catalog'
 import { elevationOf } from '../lib/factory'
 import { boundsOf, cableLengths, pointOnWall, wallAngleDeg, wallDir, wallLength, wallNormal } from '../lib/geom'
 import { horizontalBands, verticalSpans } from '../lib/zones'
@@ -188,9 +188,10 @@ function DeviceMesh({
   elevation: number
   onSelect: () => void
 }) {
+  const settings = useStore((st) => st.project.settings)
   const w = floor.walls.find((x) => x.id === device.wallId)
   if (!w) return null
-  const dt = deviceType(device.typeId)
+  const dt = devType(device, settings)
   const c = pointOnWall(w, device.offset)
   const n = wallNormal(w)
   const off = w.thickness / 2 + dt.d / 2

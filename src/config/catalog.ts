@@ -1,4 +1,4 @@
-import type { ProjectSettings, ZoneSettings, InstallMethod } from '../types'
+import type { Device, ProjectSettings, ZoneSettings, InstallMethod } from '../types'
 
 // ---------------------------------------------------------------------------
 // Gerätetypen (Dosen, Steckdosen, Schalter, KNX, Netzwerk, Displays)
@@ -19,6 +19,16 @@ export interface DeviceType {
   color: string
   price: number
   boxPrice: number // zugehörige Unterputz-/Gerätedose
+  gangs?: number // Rahmenfelder bei Schalterserien (Breite = Rahmen + (n−1) · Mittenabstand)
+  sizes?: SizeVariant[] // Größenvarianten bei Typen ohne Rahmen (Richtwerte)
+  box?: boolean // hat eine Unterputz-/Gerätedose (Auswahl möglich)
+}
+
+export interface SizeVariant {
+  id: string
+  label: string
+  w: number
+  h: number
 }
 
 export const CATEGORY_LABEL: Record<DeviceCategory, string> = {
@@ -32,33 +42,155 @@ export const CATEGORY_LABEL: Record<DeviceCategory, string> = {
 }
 
 export const DEVICE_TYPES: DeviceType[] = [
-  { id: 'sd-1', name: 'Steckdose 1-fach', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#ff9f0a', price: 4.5, boxPrice: 1.2 },
-  { id: 'sd-2', name: 'Steckdose 2-fach', category: 'power', defaultHeight: 300, w: 152, h: 80, d: 12, color: '#ff9f0a', price: 9, boxPrice: 2.4 },
-  { id: 'sd-3', name: 'Steckdose 3-fach', category: 'power', defaultHeight: 300, w: 224, h: 80, d: 12, color: '#ff9f0a', price: 13.5, boxPrice: 3.6 },
-  { id: 'sd-4', name: 'Steckdose 4-fach', category: 'power', defaultHeight: 300, w: 296, h: 80, d: 12, color: '#ff9f0a', price: 18, boxPrice: 4.8 },
-  { id: 'sd-herd', name: 'Herdanschluss 400 V', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 15, color: '#ff453a', price: 12, boxPrice: 2.5 },
-  { id: 'sw-1', name: 'Schalter 1-fach', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 6, boxPrice: 1.2 },
-  { id: 'sw-w', name: 'Wechselschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 7, boxPrice: 1.2 },
-  { id: 'sw-2', name: 'Serienschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 9, boxPrice: 1.2 },
-  { id: 'sw-jal', name: 'Jalousietaster', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#5e5ce6', price: 11, boxPrice: 1.2 },
-  { id: 'poe', name: 'RJ45-Auslass (PoE, Kamera / Access Point)', category: 'data', defaultHeight: 2400, w: 80, h: 80, d: 12, color: '#0a84ff', price: 16, boxPrice: 1.2 },
-  { id: 'eth-1', name: 'Ethernet-Dose 1-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 14, boxPrice: 1.2 },
-  { id: 'eth-2', name: 'Ethernet-Dose 2-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 24, boxPrice: 1.2 },
-  { id: 'knx-4', name: 'KNX-Taster 4-fach', category: 'knx', defaultHeight: 1050, w: 80, h: 80, d: 10, color: '#30d158', price: 110, boxPrice: 1.2 },
-  { id: 'knx-ts', name: 'KNX-Raumtemperaturregler', category: 'knx', defaultHeight: 1500, w: 80, h: 80, d: 10, color: '#30d158', price: 120, boxPrice: 1.2 },
-  { id: 'disp', name: 'Wanddisplay (KNX)', category: 'display', defaultHeight: 1500, w: 200, h: 130, d: 15, color: '#bf5af2', price: 450, boxPrice: 8 },
-  { id: 'cam', name: 'Überwachungskamera (PoE)', category: 'iot', defaultHeight: 2400, w: 90, h: 90, d: 120, color: '#ff375f', price: 120, boxPrice: 3.5 },
-  { id: 'nfc', name: 'NFC-Leser (Zutritt)', category: 'iot', defaultHeight: 1200, w: 80, h: 80, d: 15, color: '#5ac8fa', price: 160, boxPrice: 1.2 },
-  { id: 'pin', name: 'PIN-Eingabetaster', category: 'iot', defaultHeight: 1200, w: 85, h: 85, d: 15, color: '#5e5ce6', price: 95, boxPrice: 1.2 },
-  { id: 'bell', name: 'Video-Türklingel', category: 'iot', defaultHeight: 1400, w: 70, h: 150, d: 25, color: '#ac8e68', price: 140, boxPrice: 2.5 },
-  { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0 },
-  { id: 'kab-aus', name: 'Kabelauslassdose (Bürste)', category: 'box', defaultHeight: 1100, w: 80, h: 80, d: 12, color: '#8e8e93', price: 7, boxPrice: 1.2 },
-  { id: 'dose-ab', name: 'Abzweigdose', category: 'box', defaultHeight: 2300, w: 80, h: 80, d: 4, color: '#8e8e93', price: 1.8, boxPrice: 0 },
-  { id: 'uv', name: 'Unterverteiler', category: 'box', defaultHeight: 1500, w: 400, h: 600, d: 80, color: '#636366', price: 120, boxPrice: 0 },
+  { id: 'sd-1', name: 'Steckdose 1-fach', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#ff9f0a', price: 4.5, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'sd-2', name: 'Steckdose 2-fach', category: 'power', defaultHeight: 300, w: 152, h: 80, d: 12, color: '#ff9f0a', price: 9, boxPrice: 2.4, gangs: 2, box: true },
+  { id: 'sd-3', name: 'Steckdose 3-fach', category: 'power', defaultHeight: 300, w: 224, h: 80, d: 12, color: '#ff9f0a', price: 13.5, boxPrice: 3.6, gangs: 3, box: true },
+  { id: 'sd-4', name: 'Steckdose 4-fach', category: 'power', defaultHeight: 300, w: 296, h: 80, d: 12, color: '#ff9f0a', price: 18, boxPrice: 4.8, gangs: 4, box: true },
+  { id: 'sd-herd', name: 'Herdanschluss 400 V', category: 'power', defaultHeight: 300, w: 80, h: 80, d: 15, color: '#ff453a', price: 12, boxPrice: 2.5, gangs: 1, box: true },
+  { id: 'sw-1', name: 'Schalter 1-fach', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 6, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'sw-w', name: 'Wechselschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 7, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'sw-2', name: 'Serienschalter', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 9, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'sw-jal', name: 'Jalousietaster', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#5e5ce6', price: 11, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'poe', name: 'RJ45-Auslass (PoE, Kamera / Access Point)', category: 'data', defaultHeight: 2400, w: 80, h: 80, d: 12, color: '#0a84ff', price: 16, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'eth-1', name: 'Ethernet-Dose 1-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 14, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'eth-2', name: 'Ethernet-Dose 2-fach (RJ45)', category: 'data', defaultHeight: 300, w: 80, h: 80, d: 12, color: '#0a84ff', price: 24, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'knx-4', name: 'KNX-Taster 4-fach', category: 'knx', defaultHeight: 1050, w: 80, h: 80, d: 10, color: '#30d158', price: 110, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'knx-ts', name: 'KNX-Raumtemperaturregler', category: 'knx', defaultHeight: 1500, w: 80, h: 80, d: 10, color: '#30d158', price: 120, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'disp', name: 'Wanddisplay (KNX)', category: 'display', defaultHeight: 1500, w: 200, h: 130, d: 15, color: '#bf5af2', price: 450, boxPrice: 8, box: true, sizes: [{ id: 'd4', label: 'Display ≈ 4″ (120 × 90)', w: 120, h: 90 }, { id: 'd7', label: 'Display ≈ 7″ (200 × 130)', w: 200, h: 130 }, { id: 'd10', label: 'Display ≈ 10″ (270 × 185)', w: 270, h: 185 }] },
+  { id: 'cam', name: 'Überwachungskamera (PoE)', category: 'iot', defaultHeight: 2400, w: 90, h: 90, d: 120, color: '#ff375f', price: 120, boxPrice: 3.5, sizes: [{ id: 'c90', label: 'Mini-Dome Ø 90', w: 90, h: 90 }, { id: 'c120', label: 'Dome Ø 120', w: 120, h: 120 }, { id: 'c150', label: 'Bullet / Tube 150 × 80', w: 150, h: 80 }] },
+  { id: 'nfc', name: 'NFC-Leser (Zutritt)', category: 'iot', defaultHeight: 1200, w: 80, h: 80, d: 15, color: '#5ac8fa', price: 160, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'pin', name: 'PIN-Eingabetaster', category: 'iot', defaultHeight: 1200, w: 85, h: 85, d: 15, color: '#5e5ce6', price: 95, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'bell', name: 'Video-Türklingel', category: 'iot', defaultHeight: 1400, w: 70, h: 150, d: 25, color: '#ac8e68', price: 140, boxPrice: 2.5, box: true, sizes: [{ id: 'b1', label: 'Slim 55 × 135', w: 55, h: 135 }, { id: 'b2', label: 'Standard 70 × 150', w: 70, h: 150 }, { id: 'b3', label: 'Groß 100 × 200', w: 100, h: 200 }] },
+  { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0, sizes: [{ id: 'e1', label: 'Wallbox kompakt 220 × 330', w: 220, h: 330 }, { id: 'e2', label: 'Ladesäule 300 × 1400', w: 300, h: 1400 }] },
+  { id: 'kab-aus', name: 'Kabelauslassdose (Bürste)', category: 'box', defaultHeight: 1100, w: 80, h: 80, d: 12, color: '#8e8e93', price: 7, boxPrice: 1.2, gangs: 1, box: true },
+  { id: 'dose-ab', name: 'Abzweigdose', category: 'box', defaultHeight: 2300, w: 80, h: 80, d: 4, color: '#8e8e93', price: 1.8, boxPrice: 0, sizes: [{ id: 'a70', label: 'Abzweigdose Ø 70', w: 70, h: 70 }, { id: 'a80', label: 'Abzweigdose Ø 80', w: 80, h: 80 }, { id: 'a100', label: 'Abzweigdose Ø 100', w: 100, h: 100 }] },
+  { id: 'uv', name: 'Unterverteiler', category: 'box', defaultHeight: 1500, w: 400, h: 600, d: 80, color: '#636366', price: 120, boxPrice: 0, sizes: [{ id: 'u1', label: 'Verteiler 1 × 12 TE (≈ 300 × 200)', w: 300, h: 200 }, { id: 'u2', label: 'Verteiler 2 × 12 TE (≈ 300 × 330)', w: 300, h: 330 }, { id: 'u3', label: 'Verteiler 3 × 12 TE (≈ 400 × 600)', w: 400, h: 600 }] },
 ]
 
 export function deviceType(id: string): DeviceType {
   return DEVICE_TYPES.find((t) => t.id === id) ?? DEVICE_TYPES[0]
+}
+
+// ---------------------------------------------------------------------------
+// Schalterserien (Rahmenmaße) und Unterputzdosen
+// Rahmen 1-fach: Gira Standard 55 = 80,7 × 80,7 mm, Busch-Jaeger Reflex SI = 81 mm (4-fach 294 × 81 mm);
+// Mittenabstand in Mehrfachkombinationen 71 mm. Wippe/Einsatz meist 55 × 55 mm.
+// Einträge mit „≈“ sind Richtwerte – vor der Bestellung im Datenblatt des Herstellers prüfen.
+// ---------------------------------------------------------------------------
+
+export interface Series {
+  id: string
+  name: string
+  frame: number // Außenmaß Einfachrahmen (quadratisch), mm
+  pitch: number // Mittenabstand zwischen zwei Feldern, mm
+  verified: boolean
+}
+
+export const SERIES: Series[] = [
+  { id: 'gira-s55', name: 'Gira Standard 55 / System 55', frame: 80.7, pitch: 71, verified: true },
+  { id: 'bj-reflex', name: 'Busch-Jaeger Reflex SI', frame: 81, pitch: 71, verified: true },
+  { id: 'generic', name: 'Allgemein 80 × 80 mm', frame: 80, pitch: 71, verified: false },
+  { id: 'berker-s1', name: 'Berker S.1 / Q.1 (≈)', frame: 80, pitch: 71, verified: false },
+  { id: 'jung-ls990', name: 'Jung LS 990 (≈)', frame: 80, pitch: 71, verified: false },
+  { id: 'merten-m', name: 'Schneider Merten System M (≈)', frame: 80, pitch: 71, verified: false },
+]
+export const DEFAULT_SERIES_ID = 'gira-s55'
+
+export function seriesById(id: string | undefined): Series {
+  return SERIES.find((x) => x.id === id) ?? SERIES.find((x) => x.id === DEFAULT_SERIES_ID)!
+}
+
+export interface BoxPreset {
+  id: string
+  name: string
+  dia: number // Außendurchmesser der Dose
+  depth: number
+  drill: number // Bohrkronen-Durchmesser
+}
+
+export const BOX_PRESETS: BoxPreset[] = [
+  { id: 'g60-40', name: 'Gerätedose Ø 60 × 40 (flach)', dia: 60, depth: 40, drill: 68 },
+  { id: 'g60-47', name: 'Gerätedose Ø 60 × 47 (Standard)', dia: 60, depth: 47, drill: 68 },
+  { id: 'g60-61', name: 'Gerätedose Ø 60 × 61 (tief)', dia: 60, depth: 61, drill: 68 },
+  { id: 'g60-75', name: 'Gerätedose Ø 60 × 75 (extra tief, Netzwerk/Aktor)', dia: 60, depth: 75, drill: 68 },
+  { id: 'h68-47', name: 'Hohlwanddose Ø 68 × 47', dia: 68, depth: 47, drill: 68 },
+  { id: 'h68-61', name: 'Hohlwanddose Ø 68 × 61 (tief)', dia: 68, depth: 61, drill: 68 },
+]
+export const DEFAULT_BOX_ID = 'g60-47'
+export const BOX_PITCH = 71 // mm Mittenabstand mehrerer Dosen in einer Kombination
+
+/** Auswahl der Maße, wie sie im Gerät und in den Werkzeugoptionen gespeichert wird. */
+export type DeviceSpec = Pick<Device, 'seriesId' | 'sizeId' | 'w' | 'h' | 'boxId' | 'boxDia' | 'boxDepth'>
+
+export interface ResolvedBox {
+  name: string
+  dia: number
+  depth: number
+  drill: number
+  count: number
+  pitch: number
+}
+
+export interface ResolvedDevice {
+  dt: DeviceType // mit überschriebenen Maßen w/h
+  series?: Series
+  sizeLabel: string
+  box?: ResolvedBox
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10
+
+/** Wendet Serie, Größenvariante bzw. eigene Maße und die Dose auf einen Gerätetyp an. */
+export function resolveSpec(typeId: string, spec: DeviceSpec = {}, defaultSeriesId?: string): ResolvedDevice {
+  const base = deviceType(typeId)
+  let w = base.w
+  let h = base.h
+  let series: Series | undefined
+  let sizeLabel = `${r1(w)} × ${r1(h)} mm`
+  if (base.gangs) {
+    if (spec.seriesId === 'custom' && spec.w && spec.h) {
+      w = spec.w
+      h = spec.h
+      sizeLabel = `eigene Maße ${r1(w)} × ${r1(h)} mm`
+    } else {
+      series = seriesById(spec.seriesId && spec.seriesId !== 'custom' ? spec.seriesId : defaultSeriesId)
+      w = r1(series.frame + (base.gangs - 1) * series.pitch)
+      h = series.frame
+      sizeLabel = `${series.name} · ${r1(w)} × ${r1(h)} mm`
+    }
+  } else if (base.sizes) {
+    if (spec.sizeId === 'custom' && spec.w && spec.h) {
+      w = spec.w
+      h = spec.h
+      sizeLabel = `eigene Maße ${r1(w)} × ${r1(h)} mm`
+    } else {
+      const v = base.sizes.find((x) => x.id === spec.sizeId) ?? base.sizes.find((x) => x.w === base.w && x.h === base.h) ?? base.sizes[0]
+      w = v.w
+      h = v.h
+      sizeLabel = v.label
+    }
+  }
+  let box: ResolvedBox | undefined
+  if (base.box) {
+    const count = Math.max(1, base.gangs ?? 1)
+    if (spec.boxId === 'custom' && spec.boxDia && spec.boxDepth) {
+      box = { name: `Eigene Dose Ø ${r1(spec.boxDia)} × ${r1(spec.boxDepth)}`, dia: spec.boxDia, depth: spec.boxDepth, drill: Math.max(68, spec.boxDia + 8), count, pitch: BOX_PITCH }
+    } else {
+      const bp = BOX_PRESETS.find((x) => x.id === spec.boxId) ?? BOX_PRESETS.find((x) => x.id === DEFAULT_BOX_ID)!
+      box = { name: bp.name, dia: bp.dia, depth: bp.depth, drill: bp.drill, count, pitch: BOX_PITCH }
+    }
+  }
+  return { dt: { ...base, w, h }, series, sizeLabel, box }
+}
+
+/** Auflösung für ein platziertes Gerät unter den Projekteinstellungen. */
+export function resolveDevice(d: Device, settings: ProjectSettings): ResolvedDevice {
+  return resolveSpec(d.typeId, d, settings.seriesId)
+}
+
+/** Gerätetyp mit den für dieses Gerät gültigen Maßen. */
+export function devType(d: Device, settings: ProjectSettings): DeviceType {
+  return resolveDevice(d, settings).dt
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +268,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   innerThickness: 115,
   levelHeight: 2800,
   grid: 50,
+  seriesId: DEFAULT_SERIES_ID,
   zones: DEFAULT_ZONES,
   vde: {
     dropLimitPct: 3,

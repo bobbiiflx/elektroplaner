@@ -17,7 +17,8 @@ import {
 } from '../lib/geom'
 import { findJoined, moveEnds, syncDeviceNodes, type WallEnd } from '../lib/link'
 import { formatLen } from '../lib/units'
-import { PlanDims } from './dims'
+import { Dim, FreeDim, PlanDims } from './dims'
+import { autoRef, lockAxis, snapPlanPoint } from '../lib/autoDims'
 import { LenField } from './NumberField'
 import { routeTo } from '../lib/cableRoute'
 import { PlanSymbolShape } from './DeviceIcons'
@@ -47,6 +48,7 @@ const HINTS: Record<string, string> = {
   opening: 'Auf eine Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
   device: 'Auf eine Wand klicken, um das Gerät zu setzen',
   cable: 'Leitungen laufen nur waagerecht/senkrecht · Dose oder Schalter anklicken verbindet · Enter beendet · Detailarbeit in der Wandansicht (E)',
+  measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
 }
 
@@ -80,6 +82,8 @@ export default function Editor2D() {
   const [cableDraft, setCableDraft] = useState<CableNode[]>([])
   const [calib, setCalib] = useState<{ a?: Vec2; b?: Vec2 }>({})
   const [calibReal, setCalibReal] = useState(0)
+  const [measureA, setMeasureA] = useState<Vec2 | null>(null)
+  const [shiftDown, setShiftDown] = useState(false)
 
   const settings = project.settings
   const bg = floor.background
@@ -177,6 +181,7 @@ export default function Editor2D() {
     setDraft(null)
     setCableDraft([])
     setCalib({})
+    setMeasureA(null)
   }, [])
 
   const finishCable = useCallback(() => {
@@ -198,7 +203,7 @@ export default function Editor2D() {
       } else if (e.key === 'Escape') {
         const st = useStore.getState()
         if (st.pickerOpen) st.setPickerOpen(false)
-        else if (draft || cableDraft.length || calib.a) cancelDrafts()
+        else if (draft || cableDraft.length || calib.a || measureA) cancelDrafts()
         else setTool('select')
       } else if (e.key === 'Enter') {
         if (tool === 'cable') finishCable()
@@ -216,7 +221,7 @@ export default function Editor2D() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [draft, cableDraft, calib.a, tool, cancelDrafts, finishCable, fit, setTool])
+  }, [draft, cableDraft, calib.a, measureA, tool, cancelDrafts, finishCable, fit, setTool])
 
   useEffect(() => {
     cancelDrafts()
@@ -351,6 +356,7 @@ export default function Editor2D() {
         offset: hit.t,
         side: hit.signed >= 0 ? 1 : -1,
         height: dt.defaultHeight,
+        ...opts.spec,
       })
     })
     select({ kind: 'device', id })
@@ -394,6 +400,31 @@ export default function Editor2D() {
       return
     }
     setCableDraft([...cableDraft, { x: last.x, y: last.y, z: opts.cableZ }])
+  }
+
+  /** Punkt des Lineals: rastet (wenn aktiv) an Objektmitten, Wand-/Öffnungspunkten oder am Raster ein; Umschalt = waagerecht/senkrecht. */
+  const measurePoint = (raw: Vec2, shift: boolean) => {
+    let r = snapPlanPoint(floor, raw, 14 / s, settings.grid, opts.snap)
+    if (shift && measureA) r = { ...r, p: lockAxis(measureA, opts.snap ? snapPlanPoint(floor, raw, 14 / s, settings.grid, true).p : raw) }
+    return r
+  }
+
+  const addMeasurePoint = (raw: Vec2, shift: boolean) => {
+    const { p } = measurePoint(raw, shift)
+    if (!measureA) {
+      setMeasureA(p)
+      return
+    }
+    if (dist(measureA, p) < 1) return
+    const id = uid('m_')
+    const a = measureA
+    edit((pr) => {
+      const f = pr.floors.find((x) => x.id === floor.id)
+      if (!f) return
+      f.dims = f.dims ?? []
+      f.dims.push({ id, space: 'plan', a, b: p })
+    })
+    setMeasureA(null)
   }
 
   const addCalibPoint = (raw: Vec2) => {
@@ -458,6 +489,9 @@ export default function Editor2D() {
       case 'cable':
         addCableNode(raw)
         break
+      case 'measure':
+        addMeasurePoint(raw, e.shiftKey)
+        break
       case 'calibrate':
         addCalibPoint(raw)
         break
@@ -467,6 +501,7 @@ export default function Editor2D() {
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const raw = toPlan(e.clientX, e.clientY)
     setCursor(raw)
+    if (e.shiftKey !== shiftDown) setShiftDown(e.shiftKey)
     const d = dragRef.current
     if (!d) return
     if (d.kind === 'pan') {
@@ -540,7 +575,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -604,6 +639,21 @@ export default function Editor2D() {
   const shape = (cat: DeviceCategory, r: number, fill: string, selected: boolean) => (
     <PlanSymbolShape cat={cat} r={r} fill={fill} stroke={selected ? 'var(--accent)' : 'var(--paper)'} sw={selected ? px(2.5) : px(1.5)} />
   )
+
+  /** Mittenbemaßung entlang der Wand: zur nächsten Wandkante, bzw. nur zur Mitte eines Objekts auf gleicher Höhe. */
+  const planAutoDim = (wall: Wall, t: number, z: number, side: 1 | -1, ignoreId?: string) => {
+    const ref = autoRef(wall, floor.devices, t, z, ignoreId)
+    if (Math.abs(ref.u - t) < 1) return null
+    const ang = wallAngleDeg(wall)
+    const y = side * (wall.thickness / 2 + px(26))
+    return (
+      <g transform={`translate(${wall.a.x} ${wall.a.y}) rotate(${ang})`} style={{ pointerEvents: 'none' }}>
+        <Dim x1={ref.u} y1={y} x2={t} y2={y} text={formatLen(Math.abs(ref.u - t), unit)} px={px} flip={ang > 90 || ang < -90} />
+        <line x1={ref.u} y1={0} x2={ref.u} y2={y} stroke="var(--dim, var(--accent))" strokeWidth={px(0.8)} strokeDasharray={`${px(3)} ${px(3)}`} opacity={0.6} />
+        <line x1={t} y1={0} x2={t} y2={y} stroke="var(--dim, var(--accent))" strokeWidth={px(0.8)} strokeDasharray={`${px(3)} ${px(3)}`} opacity={0.6} />
+      </g>
+    )
+  }
 
   const selWall = selection?.kind === 'wall' ? floor.walls.find((w) => w.id === selection.id) : undefined
   const calibMeasured = calib.a && calib.b ? dist(calib.a, calib.b) : 0
@@ -732,6 +782,30 @@ export default function Editor2D() {
           })}
 
           {showDims && <PlanDims floor={floor} unit={unit} px={px} />}
+          {(floor.dims ?? [])
+            .filter((m) => m.space === 'plan')
+            .map((m) => (
+              <FreeDim
+                key={m.id}
+                a={m.a}
+                b={m.b}
+                text={formatLen(dist(m.a, m.b), unit)}
+                px={px}
+                selected={selection?.kind === 'dim' && selection.id === m.id}
+                onPointerDown={tool === 'select' ? (e) => beginElementDrag(e, null, { kind: 'dim', id: m.id }) : undefined}
+              />
+            ))}
+          {tool === 'measure' && cursor && (() => {
+            const r = measurePoint(cursor, shiftDown)
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                {measureA && <FreeDim a={measureA} b={r.p} text={formatLen(dist(measureA, r.p), unit)} px={px} color="var(--accent)" ghost />}
+                {measureA && <circle cx={measureA.x} cy={measureA.y} r={px(4)} fill="var(--accent)" />}
+                <circle cx={r.p.x} cy={r.p.y} r={px(r.kind === 'device' ? 8 : 5)} fill={r.kind === 'device' ? 'none' : 'var(--accent)'} stroke="var(--accent)" strokeWidth={px(2)} />
+                {r.kind === 'device' && label('Mitte', r.p.x, r.p.y - px(16), 0, 'var(--accent)')}
+              </g>
+            )
+          })()}
 
           {/* Geräte */}
           {floor.devices.map((d) => {
@@ -819,8 +893,15 @@ export default function Editor2D() {
             return (
               <g transform={`translate(${pos.x} ${pos.y})`} opacity={0.6} style={{ pointerEvents: 'none' }}>
                 {shape(dt.category, r, dt.color, false)}
+                {label(`H ${formatLen(dt.defaultHeight, unit)}`, 0, -r - px(11))}
               </g>
             )
+          })()}
+          {ghost && tool === 'device' && planAutoDim(ghost.wall, ghost.t, deviceType(opts.deviceTypeId).defaultHeight, ghost.signed >= 0 ? 1 : -1)}
+          {tool === 'select' && selection?.kind === 'device' && (() => {
+            const dv = floor.devices.find((x) => x.id === selection.id)
+            const w = dv && floor.walls.find((x) => x.id === dv.wallId)
+            return dv && w ? planAutoDim(w, dv.offset, dv.height, dv.side, dv.id) : null
           })()}
 
           {/* Leitungsentwurf */}

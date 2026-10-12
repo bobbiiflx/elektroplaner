@@ -139,3 +139,48 @@ describe('Leitungsführung (nur waagerecht/senkrecht)', () => {
     expect(nodes).toHaveLength(1)
   })
 })
+
+import { autoRef, lockAxis, snapPlanPoint, snapWallPoint } from './autoDims'
+import { devType, resolveSpec } from '../config/catalog'
+
+describe('autoDims', () => {
+  const wall = { id: 'w', a: { x: 0, y: 0 }, b: { x: 4000, y: 0 }, thickness: 240, kind: 'outer' as const }
+  const dev = (id: string, offset: number, height: number) => ({ id, typeId: 'sd-1', wallId: 'w', offset, side: 1 as const, height })
+  it('misst zur nächsten Wandkante, wenn nichts auf gleicher Höhe liegt', () => {
+    expect(autoRef(wall, [dev('a', 2000, 1050)], 700, 300)).toEqual({ kind: 'wall', end: 'start', u: 0 })
+    expect(autoRef(wall, [], 3500, 300)).toEqual({ kind: 'wall', end: 'end', u: 4000 })
+  })
+  it('misst nur zur Mitte eines Objekts auf gleicher Höhe', () => {
+    expect(autoRef(wall, [dev('a', 2000, 300), dev('b', 3100, 300), dev('c', 900, 1050)], 3500, 300)).toEqual({ kind: 'device', id: 'b', u: 3100 })
+    expect(autoRef(wall, [dev('a', 2000, 300)], 2000, 300, 'a')).toEqual({ kind: 'wall', end: 'start', u: 0 })
+  })
+  it('rastet im Grundriss an Objektmitten ein, sonst am Raster, ausgeschaltet frei', () => {
+    const floor = { id: 'f', name: '', levelHeight: 2800, wallHeight: 2500, walls: [wall], openings: [], devices: [dev('a', 1000, 300)], cables: [] }
+    expect(snapPlanPoint(floor, { x: 1010, y: 130 }, 60, 50, true)).toMatchObject({ kind: 'device', p: { x: 1000, y: 120 } })
+    expect(snapPlanPoint(floor, { x: 2037, y: 1013 }, 60, 50, true)).toMatchObject({ kind: 'grid', p: { x: 2050, y: 1000 } })
+    expect(snapPlanPoint(floor, { x: 2037, y: 1013 }, 60, 50, false)).toMatchObject({ kind: 'free', p: { x: 2037, y: 1013 } })
+  })
+  it('rastet in der Wandansicht an Objektmitten ein', () => {
+    const r = snapWallPoint(wall, 2500, [dev('a', 1000, 300)], [], { x: 1020, y: 310 }, 40, 50, true)
+    expect(r).toMatchObject({ kind: 'device', p: { x: 1000, y: 300 } })
+    expect(snapWallPoint(wall, 2500, [], [], { x: 1020, y: 310 }, 40, 50, false).p).toEqual({ x: 1020, y: 310 })
+  })
+  it('sperrt auf eine Achse', () => {
+    expect(lockAxis({ x: 0, y: 0 }, { x: 500, y: 40 })).toEqual({ x: 500, y: 0 })
+  })
+})
+
+describe('Schalterserien und Dosen', () => {
+  it('berechnet Rahmenbreiten aus Serie und Mittenabstand', () => {
+    expect(resolveSpec('sd-1', {}, 'gira-s55').dt.w).toBeCloseTo(80.7)
+    expect(resolveSpec('sd-4', { seriesId: 'bj-reflex' }).dt.w).toBe(294) // 81 + 3 · 71, wie das Datenblatt
+    expect(resolveSpec('sd-2', { seriesId: 'custom', w: 160, h: 90 }).dt).toMatchObject({ w: 160, h: 90 })
+  })
+  it('wählt Größenvarianten und Dose', () => {
+    expect(resolveSpec('disp', { sizeId: 'd10' }).dt).toMatchObject({ w: 270, h: 185 })
+    const r = resolveSpec('sd-3', { boxId: 'h68-61' })
+    expect(r.box).toMatchObject({ dia: 68, depth: 61, count: 3, pitch: 71 })
+    expect(resolveSpec('cam').box).toBeUndefined()
+    expect(devType({ id: 'x', typeId: 'sw-1', wallId: 'w', offset: 0, side: 1, height: 0 }, { seriesId: 'bj-reflex' } as never).w).toBe(81)
+  })
+})

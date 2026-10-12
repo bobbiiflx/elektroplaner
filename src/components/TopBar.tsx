@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, FolderOpen, Pencil, Plus, Printer, Ruler, Redo2, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
+import { Check, ChevronDown, Download, FolderOpen, Pencil, Plus, Printer, RulerDimensionLine, Redo2, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
 import { exportJson } from '../lib/storage'
 import { UNITS } from '../lib/units'
@@ -178,7 +178,7 @@ export default function TopBar() {
       </button>
 
       <button className={'btn small' + (showDims ? ' primary' : '')} onClick={toggleDims} title="Bemaßung ein-/ausblenden">
-        <Ruler size={14} /> Maße
+        <RulerDimensionLine size={14} /> Maße
       </button>
       <button className="btn small" onClick={() => setPrintOpen(true)} title="Druckansicht mit Bemaßung und Checklisten">
         <Printer size={14} /> Drucken

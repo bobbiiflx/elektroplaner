@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { produce, type Draft } from 'immer'
 import type {
+  Group,
   Background,
   CableNode,
   Circuit,
@@ -14,6 +15,7 @@ import type {
 import { newFloor, newProject, sampleProject } from './lib/factory'
 import { CIRCUIT_COLORS, cableType, type DeviceSpec } from './config/catalog'
 import type { ColorBy } from './lib/completeness'
+import { nextGA } from './lib/groups'
 import { uid } from './lib/geom'
 import * as storage from './lib/storage'
 
@@ -90,6 +92,8 @@ interface State {
   toggleDims: () => void
   setColorBy: (c: ColorBy) => void
   addCircuit: (partial?: Partial<Circuit>) => string
+  addGroup: (partial?: Partial<Group>) => string
+  addScene: () => string
   setPrintOpen: (v: boolean) => void
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
@@ -235,6 +239,25 @@ export const useStore = create<State>((set, get) => ({
         color: CIRCUIT_COLORS[n % CIRCUIT_COLORS.length],
         ...partial,
       })
+    })
+    return id
+  },
+  addGroup: (partial) => {
+    const id = uid('g_')
+    get().edit((p) => {
+      p.groups = p.groups ?? []
+      p.groups.push({ id, name: `Gruppe ${p.groups.length + 1}`, ga: nextGA(p.groups), ...partial })
+    })
+    return id
+  },
+  addScene: () => {
+    const id = uid('s_')
+    get().edit((p) => {
+      p.scenes = p.scenes ?? []
+      const used = new Set(p.scenes.map((x) => x.no))
+      let no = 1
+      while (used.has(no)) no++
+      p.scenes.push({ id, name: `Szene ${no}`, no, values: {} })
     })
     return id
   },

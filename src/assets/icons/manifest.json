@@ -37,7 +37,17 @@
   "l-bild.png": "6. Blatt (Leuchten) l11",
   "l-vent.png": "6. Blatt (Leuchten) l12",
   "l-rgb.png": "6. Blatt (Leuchten) l14",
-  "l-not.png": "6. Blatt (Leuchten) l15"
+  "l-not.png": "6. Blatt (Leuchten) l15",
+  "l-decke.png": "7. Blatt m01",
+  "a-decke.png": "m02",
+  "a-wand.png": "m03",
+  "l-panel.png": "m05",
+  "l-feucht.png": "m07",
+  "l-feucht-q.png": "m08",
+  "knx-bm.png": "m09",
+  "dimm-t.png": "m10",
+  "knx-pm.png": "m13",
+  "dimm-d.png": "m14"
  },
  "unused": {
   "steckdose-1fach-foto.png": "steckdose-1fach-foto (Duplikat zu sd-1)",
@@ -95,6 +105,12 @@
   "bogenstehleuchte.png": "6. Blatt (Leuchten) l02 – mobile Leuchte, kein Installationsobjekt",
   "arbeitsleuchte-gelenkarm.png": "6. Blatt (Leuchten) l09 – mobile Leuchte, kein Installationsobjekt",
   "leselampe-klemmleuchte.png": "6. Blatt (Leuchten) l13 – mobile Leuchte, kein Installationsobjekt",
-  "werkstatt-handlampe.png": "6. Blatt (Leuchten) l16 – mobile Leuchte, kein Installationsobjekt"
+  "werkstatt-handlampe.png": "6. Blatt (Leuchten) l16 – mobile Leuchte, kein Installationsobjekt",
+  "wandauslass-v2.png": "7. Blatt m04 – Wandauslass Alternative",
+  "led-stripe-rgb-set.png": "7. Blatt m06 – LED-Stripe mit Fernbedienung",
+  "knx-aktor-schalt-8fach.png": "7. Blatt m11 – Schaltaktor 8-fach (für Etappe 4)",
+  "knx-aktor-jalousie-8fach.png": "7. Blatt m12 – Jalousieaktor 8-fach (für Etappe 4)",
+  "knx-aktor-dimm-4fach.png": "7. Blatt m15 – Dimmaktor 4-fach (für Etappe 4)",
+  "knx-aktor-heizung-6fach.png": "7. Blatt m16 – Heizungs-/Schaltaktor 6-fach (für Etappe 4)"
  }
 }

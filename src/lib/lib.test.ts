@@ -195,3 +195,29 @@ describe('completeness', () => {
     expect(missingFor({ ...d, circuitId: 'c1' }, dt)).not.toContain('circuit')
   })
 })
+
+import { duplicateGAs, groupStats, isValidGA, nextGA, removeGroup } from './groups'
+describe('groups', () => {
+  const mk = (over: object) => ({ id: 'x', typeId: 'l-decke', wallId: '', offset: 0, side: 1 as const, height: 2500, ...over })
+  it('Adressen: Format, Duplikate, nächste freie', () => {
+    expect(isValidGA('1/0/3')).toBe(true)
+    expect(isValidGA('1-0-3')).toBe(false)
+    const g = [{ id: 'a', name: 'A', ga: '1/0/0' }, { id: 'b', name: 'B', ga: '1/0/0', gaStatus: '1/0/1' }]
+    expect([...duplicateGAs(g)]).toEqual(['1/0/0'])
+    expect(nextGA(g)).toBe('1/0/2')
+  })
+  it('Gruppenstatistik meldet Mischdimmung und fehlenden Sender; Löschen räumt auf', () => {
+    const p = sampleProject()
+    p.groups = [{ id: 'g1', name: 'Decke', ga: '1/0/0' }]
+    p.scenes = [{ id: 's1', name: 'Abend', no: 1, values: { g1: 50 } }]
+    p.floors[0].devices.push(mk({ id: 'a', groupIds: ['g1'], dimmable: true, dimType: 'phase', powerW: 10 }), mk({ id: 'b', groupIds: ['g1'], dimmable: false, powerW: 5 }))
+    const st = groupStats(p, p.groups[0])
+    expect(st.dim).toBe('mixed')
+    expect(st.watts).toBe(15)
+    expect(st.warnings.join()).toContain('Taster')
+    removeGroup(p, 'g1')
+    expect(p.groups).toHaveLength(0)
+    expect(p.floors[0].devices.find((d) => d.id === 'a')?.groupIds).toBeUndefined()
+    expect(p.scenes[0].values.g1).toBeUndefined()
+  })
+})

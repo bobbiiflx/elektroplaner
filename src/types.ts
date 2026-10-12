@@ -59,7 +59,8 @@ export interface Device {
   x?: number
   y?: number
   // Elektrische Zuordnung (Schaltschrank-Grundlagen)
-  circuitId?: string // Stromkreis
+  circuitId?: string
+  groupIds?: string[] // KNX-Gruppen: Taster/Sensoren senden, Leuchten/Lasten empfangen
   control?: 'direct' | 'knx' // direkt über Schalter/Sicherung oder über KNX-Aktor geschaltet
   dimmable?: boolean // nur Leuchten: ja / nein (undefined = noch nicht entschieden)
   dimType?: 'phase' | 'v010' | 'dali' | 'pwm' // Dimmart
@@ -146,6 +147,24 @@ export interface Circuit {
   color: string
 }
 
+/** KNX-Gruppe (Lichtgruppe …) mit Gruppenadressen. */
+export interface Group {
+  id: string
+  name: string
+  ga: string // Gruppenadresse Schalten, z. B. „1/0/3“
+  gaDim?: string // Dimmen relativ
+  gaValue?: string // Helligkeitswert
+  gaStatus?: string // Rückmeldung
+}
+
+/** Szene: je Gruppe ein Wert in % (0 = aus, 100 = an); nicht gelistete Gruppen bleiben unverändert. */
+export interface Scene {
+  id: string
+  name: string
+  no: number // Szenennummer 1–64
+  values: Record<string, number>
+}
+
 export interface Project {
   id: string
   name: string
@@ -154,6 +173,8 @@ export interface Project {
   settings: ProjectSettings
   floors: Floor[]
   circuits?: Circuit[]
+  groups?: Group[]
+  scenes?: Scene[]
 }
 
 export interface ProjectMeta {

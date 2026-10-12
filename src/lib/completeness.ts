@@ -1,7 +1,7 @@
 import { deviceType, kindOf, type DeviceType } from '../config/catalog'
 import type { Circuit, Device, Floor, Project } from '../types'
 
-export type MissingKey = 'circuit' | 'control' | 'dimmable' | 'dimType' | 'power'
+export type MissingKey = 'circuit' | 'control' | 'dimmable' | 'dimType' | 'power' | 'group'
 
 export const MISSING_LABEL: Record<MissingKey, string> = {
   circuit: 'Stromkreis',
@@ -9,6 +9,7 @@ export const MISSING_LABEL: Record<MissingKey, string> = {
   dimmable: 'Dimmbar ja / nein',
   dimType: 'Dimmart',
   power: 'Leistung',
+  group: 'KNX-Gruppe',
 }
 
 /** Welche Angaben für den Schaltschrank noch fehlen – abhängig von der Rolle des Geräts. */
@@ -18,6 +19,7 @@ export function missingFor(d: Device, dt: DeviceType = deviceType(d.typeId)): Mi
   if (kind === 'load' || kind === 'light') {
     if (!d.circuitId) out.push('circuit')
     if (d.control === undefined) out.push('control')
+    else if (d.control === 'knx' && !d.groupIds?.length) out.push('group')
   }
   if (kind === 'light') {
     if (d.dimmable === undefined) out.push('dimmable')

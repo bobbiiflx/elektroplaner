@@ -12,6 +12,16 @@ import lBild from '../assets/icons/l-bild.png'
 import lVent from '../assets/icons/l-vent.png'
 import lRgb from '../assets/icons/l-rgb.png'
 import lNot from '../assets/icons/l-not.png'
+import lDecke from '../assets/icons/l-decke.png'
+import lPanel from '../assets/icons/l-panel.png'
+import lFeucht from '../assets/icons/l-feucht.png'
+import lFeuchtQ from '../assets/icons/l-feucht-q.png'
+import aDecke from '../assets/icons/a-decke.png'
+import aWand from '../assets/icons/a-wand.png'
+import knxBm from '../assets/icons/knx-bm.png'
+import knxPm from '../assets/icons/knx-pm.png'
+import dimmT from '../assets/icons/dimm-t.png'
+import dimmD from '../assets/icons/dimm-d.png'
 import sd4 from '../assets/icons/sd-4.png'
 import sdHerd from '../assets/icons/sd-herd.png'
 import pin from '../assets/icons/pin.png'
@@ -58,6 +68,16 @@ export const DEVICE_IMG: Record<string, string> = {
   'l-vent': lVent,
   'l-rgb': lRgb,
   'l-not': lNot,
+  'l-decke': lDecke,
+  'l-panel': lPanel,
+  'l-feucht': lFeucht,
+  'l-feucht-q': lFeuchtQ,
+  'a-decke': aDecke,
+  'a-wand': aWand,
+  'knx-bm': knxBm,
+  'knx-pm': knxPm,
+  'dimm-t': dimmT,
+  'dimm-d': dimmD,
   'sd-4': sd4,
   'sd-herd': sdHerd,
   'pin': pin,

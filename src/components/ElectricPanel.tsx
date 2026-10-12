@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react'
 import { CIRCUIT_COLORS, DIM_LABEL, FUSE_OPTIONS, deviceType, kindOf } from '../config/catalog'
+import { canJoinGroups } from '../lib/groups'
 import { MISSING_LABEL, circuitStats, missingFor, openPoints, type ColorBy, type MissingKey } from '../lib/completeness'
 import { useStore } from '../store'
 import type { Circuit, Device, Floor, Phase } from '../types'
 import { NumberField } from './NumberField'
+import { GroupSelect } from './GroupsPanel'
 import { Row, Section, Segmented } from './ui'
 
 const NEW = '__new__'
@@ -144,6 +146,7 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
   const [filter, setFilter] = useState<MissingKey | ''>('')
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [bulkCircuit, setBulkCircuit] = useState('')
+  const [bulkGroup, setBulkGroup] = useState('')
   const shown = points.filter((p) => !filter || p.missing.includes(filter))
 
   const updCircuit = (id: string, fn: (c: Circuit) => void, key?: string) =>
@@ -172,6 +175,15 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
           if (only === 'light' ? k !== 'light' : k !== 'load' && k !== 'light') continue
           Object.assign(d, patch)
           if (patch.dimmable === false) delete d.dimType
+        }
+    })
+
+  const bulkGroupAdd = (gid: string) =>
+    edit((p) => {
+      for (const f of p.floors)
+        for (const d of f.devices) {
+          if (!checked.has(d.id) || !canJoinGroups(d)) continue
+          d.groupIds = d.groupIds?.includes(gid) ? d.groupIds : [...(d.groupIds ?? []), gid]
         }
     })
 
@@ -314,6 +326,12 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
                 </button>
                 <button className="btn small" disabled={!checked.size} onClick={() => bulk({ control: 'knx' })}>
                   KNX
+                </button>
+              </div>
+              <div className="bulk-line">
+                <GroupSelect value={bulkGroup} onChange={setBulkGroup} />
+                <button className="btn small" disabled={!checked.size || !bulkGroup} onClick={() => bulkGroupAdd(bulkGroup)}>
+                  In Gruppe
                 </button>
               </div>
               <div className="bulk-line">

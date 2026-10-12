@@ -23,6 +23,7 @@ import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
+import { GroupFields, GroupsOverview } from './GroupsPanel'
 
 export default function Inspector() {
   const floor = useFloor()
@@ -299,6 +300,7 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
         )}
       </Section>
       <ElectricFields device={device} />
+      <GroupFields device={device} />
       {wall && (
       <Section title="Installationszone">
         {zone.ok ? (
@@ -568,6 +570,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
       </Section>
 
       <ElectricOverview floor={floor} />
+      <GroupsOverview />
 
       <Section title="Übersicht">
         <p className="muted small">

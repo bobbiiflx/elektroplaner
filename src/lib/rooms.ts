@@ -26,7 +26,7 @@ export function polyCentroid(p: Vec2[]): Vec2 {
   if (Math.abs(a) < 1e-6) return p[0] ?? { x: 0, y: 0 }
   return { x: cx / (3 * a), y: cy / (3 * a) }
 }
-export function pointInPoly(p: Vec2[], q: Vec2): boolean {
+function pointInPoly(p: Vec2[], q: Vec2): boolean {
   let inside = false
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
     if (p[i].y > q.y !== p[j].y > q.y && q.x < ((p[j].x - p[i].x) * (q.y - p[i].y)) / (p[j].y - p[i].y) + p[i].x) inside = !inside
@@ -40,7 +40,7 @@ function distSeg(q: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(q.x - (a.x + t * dx), q.y - (a.y + t * dy))
 }
 /** 0 innerhalb, sonst Abstand zum Umriss */
-export function distToPoly(p: Vec2[], q: Vec2): number {
+function distToPoly(p: Vec2[], q: Vec2): number {
   if (pointInPoly(p, q)) return 0
   let m = Infinity
   for (let i = 0; i < p.length; i++) m = Math.min(m, distSeg(q, p[i], p[(i + 1) % p.length]))
@@ -154,7 +154,7 @@ export interface RoomStats {
 const SOCKET_TOL = 400 // mm: Geräte an der Wandfläche gehören zum nächstgelegenen Raum
 
 /** Geräte je Raum: nächster Raum (Abstand ≤ Toleranz) */
-export function roomOfDevice(floor: Floor, p: Vec2): Room | null {
+function roomOfDevice(floor: Floor, p: Vec2): Room | null {
   let best: Room | null = null
   let bd = SOCKET_TOL
   for (const r of floor.rooms ?? []) {

@@ -20,13 +20,6 @@ export function autoRef(wall: Wall, devices: Device[], u: number, z: number, ign
   return u <= L - u ? { kind: 'wall', end: 'start', u: 0 } : { kind: 'wall', end: 'end', u: L }
 }
 
-/** Mittenpunkt eines Geräts auf der Wandachse im Grundriss. */
-export function deviceCenter(floor: Floor, d: Device): Vec2 | null {
-  const w = floor.walls.find((x) => x.id === d.wallId)
-  if (w) return pointOnWall(w, d.offset)
-  return d.x !== undefined && d.y !== undefined ? { x: d.x, y: d.y } : null
-}
-
 export interface SnapResult {
   p: Vec2
   kind: 'device' | 'wall' | 'opening' | 'grid' | 'free'

@@ -75,7 +75,7 @@ export async function loadImage(file: File, maxDim: number): Promise<{ dataUrl: 
   return { dataUrl: canvas.toDataURL(jpeg ? 'image/jpeg' : 'image/png', 0.92), width: w, height: h }
 }
 
-export function readFileAsDataUrl(file: File): Promise<string> {
+function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(String(r.result))

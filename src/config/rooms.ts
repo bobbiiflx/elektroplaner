@@ -20,7 +20,6 @@ export const ROOM_TYPES: { id: RoomType; label: string; sockets: number; lights:
   { id: 'balcony', label: 'Balkon / Loggia / Terrasse', sockets: 1, lights: 1 },
   { id: 'other', label: 'Sonstiger Raum', sockets: 1, lights: 1 },
 ]
-export const roomLabel = (t: RoomType) => ROOM_TYPES.find((x) => x.id === t)?.label ?? t
 export function roomReq(project: Pick<Project, 'roomReq'>, t: RoomType): { sockets: number; lights: number } {
   const d = ROOM_TYPES.find((x) => x.id === t) ?? ROOM_TYPES[ROOM_TYPES.length - 1]
   return project.roomReq?.[t] ?? { sockets: d.sockets, lights: d.lights }

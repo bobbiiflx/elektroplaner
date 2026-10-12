@@ -2,7 +2,7 @@ import { CABLE_TYPES, DEVICE_TYPES } from '../config/catalog'
 import type { Project } from '../types'
 import { ACTUATOR_LABELS } from './material'
 
-export const RICHTWERT_DATE = '10/2026'
+const RICHTWERT_DATE = '10/2026'
 export const RICHTWERT_NAME = `Richtwert (Stand ${RICHTWERT_DATE})`
 export const BRUTTO = 1.19
 
@@ -11,7 +11,7 @@ export const BRUTTO = 1.19
  * Leitungen: recherchiert (elektrikshop.de, 100-m-Ringe bzw. Meterware, Okt. 2026, brutto → netto).
  * Geräte, Aktoren, Datenkabel: Schätzung für Mittelklasse-Serien (Busch-Jaeger / Gira / Jung, MDT) – keine Live-Preise.
  */
-export const RICHTWERT: Record<string, number> = {
+const RICHTWERT: Record<string, number> = {
   'cab:nym-3x1.5': 0.8,
   'cab:nym-3x2.5': 1.32,
   'cab:nym-5x1.5': 1.32,

@@ -35,10 +35,7 @@ export interface AskDialog {
   onOk: (value: string) => void
 }
 
-export interface Selection {
-  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room'
-  id: string
-}
+export type Selection = Sel
 
 export interface ToolOptions {
   wallKind: WallKind
@@ -721,6 +718,8 @@ export function useFloor(): Floor {
 
 // --- automatisches Speichern ----------------------------------------------
 let saveTimer: number | undefined
+let lastSnapshot = 0
+const SNAPSHOT_GAP = 10 * 60 * 1000
 useStore.subscribe((s, prev) => {
   if (!s.ready) return
   if (s.project === prev.project || s.project.id !== prev.project.id) return
@@ -729,7 +728,10 @@ useStore.subscribe((s, prev) => {
     const proj = useStore.getState().project
     await storage.saveProject(proj)
     useStore.setState({ metas: await storage.listProjects() })
-    // Version höchstens alle 10 Minuten
-    void storage.addSnapshot(proj, 'Automatisch', 10 * 60 * 1000)
+    // Version höchstens alle 10 Minuten (spart den Datenbankzugriff bei jeder Änderung)
+    if (Date.now() - lastSnapshot > SNAPSHOT_GAP) {
+      lastSnapshot = Date.now()
+      void storage.addSnapshot(proj, 'Automatisch', SNAPSHOT_GAP)
+    }
   }, 500)
 })

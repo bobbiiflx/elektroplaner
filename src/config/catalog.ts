@@ -157,7 +157,7 @@ export const BOX_PRESETS: BoxPreset[] = [
   { id: 'h68-61', name: 'Hohlwanddose Ø 68 × 61 (tief)', dia: 68, depth: 61, drill: 68 },
 ]
 export const DEFAULT_BOX_ID = 'g60-47'
-export const BOX_PITCH = 71 // mm Mittenabstand mehrerer Dosen in einer Kombination
+const BOX_PITCH = 71 // mm Mittenabstand mehrerer Dosen in einer Kombination
 
 /** Auswahl der Maße, wie sie im Gerät und in den Werkzeugoptionen gespeichert wird. */
 export type DeviceSpec = Pick<Device, 'seriesId' | 'sizeId' | 'w' | 'h' | 'boxId' | 'boxDia' | 'boxDepth'>
@@ -290,7 +290,7 @@ export const AMPACITY: Record<InstallMethod, Record<number, [number, number]>> =
 // ---------------------------------------------------------------------------
 // Installationszonen nach DIN 18015-3 (Werte laut Abstimmung, in der App änderbar)
 // ---------------------------------------------------------------------------
-export const DEFAULT_ZONES: ZoneSettings = {
+const DEFAULT_ZONES: ZoneSettings = {
   horizontal: [
     { id: 'z-300', label: '0,30 m über OKFF', ref: 'floor', center: 300 },
     { id: 'z-1050', label: '1,05 m über OKFF', ref: 'floor', center: 1050 },
@@ -318,8 +318,6 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   },
 }
 
-export const DOOR_DEFAULT = { width: 1010, height: 2135, sill: 0 }
-export const WINDOW_DEFAULT = { width: 1010, height: 1250, sill: 900 }
 
 /** Öffnungsarten mit Standardmaßen. Der Rest der Wand (über/unter der Öffnung) bleibt immer Wand. */
 export interface OpeningDef {

@@ -2,7 +2,7 @@ import { DEFAULT_SETTINGS, cableType, deviceType } from '../config/catalog'
 import type { Floor, Project, ProjectSettings } from '../types'
 import { uid } from './geom'
 
-export function cloneSettings(): ProjectSettings {
+function cloneSettings(): ProjectSettings {
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as ProjectSettings
 }
 

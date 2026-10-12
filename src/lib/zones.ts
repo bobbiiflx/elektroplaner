@@ -1,6 +1,5 @@
 import type { Cable, Floor, Opening, Wall, ZoneSettings } from '../types'
 import { dist, projectOnWall, wallLength } from './geom'
-import { deviceType } from '../config/catalog'
 
 export interface ZoneBand {
   id: string
@@ -16,7 +15,7 @@ export function horizontalBands(zones: ZoneSettings, wallHeight: number): ZoneBa
   }))
 }
 
-export function inHorizontalZone(z: number, zones: ZoneSettings, wallHeight: number): ZoneBand | null {
+function inHorizontalZone(z: number, zones: ZoneSettings, wallHeight: number): ZoneBand | null {
   const half = zones.width / 2
   for (const b of horizontalBands(zones, wallHeight)) {
     if (Math.abs(z - b.center) <= half) return b
@@ -147,10 +146,6 @@ function nearestWallToPoint(walls: Wall[], a: { x: number; y: number }, b: { x: 
     }
   }
   return best
-}
-
-export function deviceLabel(typeId: string): string {
-  return deviceType(typeId).name
 }
 
 export { dist }

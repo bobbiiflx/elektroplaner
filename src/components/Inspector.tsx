@@ -804,13 +804,14 @@ function Check({ ok, text }: { ok: boolean; text: string }) {
 function BuildSections({ floor }: { floor: Floor }) {
   const setTool = useStore((s) => s.setTool)
   const select = useStore((s) => s.select)
+  const roomRows = useMemo(() => (floor.rooms ?? []).map((r) => ({ r, st: roomStats(floor, r) })), [floor.rooms, floor.devices, floor.walls]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <Section title="Räume">
         {(floor.rooms ?? []).length === 0 && <p className="muted small">In einen geschlossenen Raum klicken: Fläche und Ausstattung (Steckdosen, Licht) werden geprüft.</p>}
-        {(floor.rooms ?? []).map((r) => (
+        {roomRows.map(({ r, st }) => (
           <button key={r.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'room', id: r.id })}>
-            {r.name} · {polyArea(r.poly).toFixed(1).replace('.', ',')} m² · {roomStats(floor, r).sockets} Steckd. · {roomStats(floor, r).lights} Licht
+            {r.name} · {polyArea(r.poly).toFixed(1).replace('.', ',')} m² · {st.sockets} Steckd. · {st.lights} Licht
           </button>
         ))}
         <button className="btn block" onClick={() => setTool('room')}>
@@ -929,7 +930,6 @@ function FloorPanel({ floor }: { floor: Floor }) {
   const edit = useStore((s) => s.edit)
   const project = useStore((s) => s.project)
   const setTool = useStore((s) => s.setTool)
-  const select = useStore((s) => s.select)
   const openImport = useStore((s) => s.openImport)
   const clearBackground = useStore((s) => s.clearBackground)
   const removeFloor = useStore((s) => s.removeFloor)
@@ -960,13 +960,10 @@ function FloorPanel({ floor }: { floor: Floor }) {
   const refId = refSel || project.floors.find((f) => f.anchor && f.id !== floor.id)?.id || project.floors[0].id
   const stackIssues = useMemo(() => riserChecks(project), [project])
   const noAnchor = project.floors.filter((f) => !f.anchor).length
-  const bgUrl = useStore((s) => s.backgrounds[floor.id])
-  const setSuggest = useStore((s) => s.setSuggest)
   const showToast = useStore((s) => s.showToast)
   const setWallDetectOpen = useStore((s) => s.setWallDetectOpen)
 
   const tab = useStore((s) => s.inspectorTab)
-  const setTab = useStore((s) => s.setInspectorTab)
   const setSchrankOpen = useStore((s) => s.setSchrankOpen)
 
   return (

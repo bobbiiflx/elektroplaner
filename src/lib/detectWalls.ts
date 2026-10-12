@@ -59,7 +59,7 @@ export function classifyPixels(d: ArrayLike<number>, n: number, classes: ColorCl
   return cls
 }
 
-export function otsu(gray: Uint8Array): number {
+function otsu(gray: Uint8Array): number {
   const hist = new Array(256).fill(0)
   for (let i = 0; i < gray.length; i++) hist[gray[i]]++
   const total = gray.length

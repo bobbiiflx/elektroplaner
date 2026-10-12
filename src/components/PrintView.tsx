@@ -403,7 +403,7 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
               </g>
             )
           })}
-          {opts.dims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} color="#0a4a9a" />}
+          {opts.dims && <ElevationDims wall={wall} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} color="#0a4a9a" />}
           {opts.dims &&
             (floor.dims ?? [])
               .filter((m) => m.space === 'wall' && m.wallId === wall.id)

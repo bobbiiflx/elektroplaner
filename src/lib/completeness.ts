@@ -30,7 +30,7 @@ export function missingFor(d: Device, dt: DeviceType = deviceType(d.typeId)): Mi
 }
 
 /** Hat das Gerät überhaupt etwas zuzuordnen (sonst zählt es nicht zu den offenen Punkten)? */
-export const needsElectrics = (dt: DeviceType) => kindOf(dt) === 'load' || kindOf(dt) === 'light'
+const needsElectrics = (dt: DeviceType) => kindOf(dt) === 'load' || kindOf(dt) === 'light'
 
 export interface OpenPoint {
   floor: Floor
@@ -49,13 +49,13 @@ export function openPoints(project: Project): OpenPoint[] {
   return out
 }
 
-export function circuitOf(project: Pick<Project, 'circuits'>, d: Device): Circuit | undefined {
+function circuitOf(project: Pick<Project, 'circuits'>, d: Device): Circuit | undefined {
   return d.circuitId ? (project.circuits ?? []).find((c) => c.id === d.circuitId) : undefined
 }
 
 export type ColorBy = 'type' | 'circuit' | 'control'
-export const UNSET_COLOR = '#8e8e93'
-export const CONTROL_COLOR = { knx: '#30d158', direct: '#ff9f0a' }
+const UNSET_COLOR = '#8e8e93'
+const CONTROL_COLOR = { knx: '#30d158', direct: '#ff9f0a' }
 
 /** Füllfarbe des Planzeichens je nach Darstellung (Typ / Stromkreis / Steuerung). */
 export function fillFor(d: Device, dt: DeviceType, project: Pick<Project, 'circuits'>, by: ColorBy): string {

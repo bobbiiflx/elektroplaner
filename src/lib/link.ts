@@ -36,7 +36,7 @@ export function setWallLength(f: Floor, wallId: string, length: number) {
 }
 
 /** Geräte hängen per Abstand an der Wand; Leitungsknoten, die an Geräten hängen, folgen. */
-export function syncWallDevices(f: Floor, wallId: string) {
+function syncWallDevices(f: Floor, wallId: string) {
   const w = f.walls.find((x) => x.id === wallId)
   if (!w) return
   const L = wallLength(w)

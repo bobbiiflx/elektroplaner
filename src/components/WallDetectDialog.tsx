@@ -74,7 +74,6 @@ function Inner() {
   }
   const [maskUrl, setMaskUrl] = useState('')
   const [busy, setBusy] = useState(true)
-  const [error, setError] = useState('')
   const [view, setView] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   const data = useRef<{ rgba: Uint8ClampedArray; w: number; h: number; mm: number } | null>(null)
@@ -104,7 +103,7 @@ function Inner() {
       setBusy(false)
       setClasses((c) => [...c])
     }
-    im.onerror = () => setError('Bild konnte nicht gelesen werden')
+    im.onerror = () => setBusy(false)
     im.src = useVec && maskSrc ? maskSrc : url
     return () => {
       cancelled = true

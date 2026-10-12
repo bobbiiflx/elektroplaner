@@ -63,20 +63,6 @@ export async function renderWallMask(doc: PdfDoc, pageNo: number, o: MaskOpts): 
       else i += 1
     }
   }
-  /** Eckpunkte in Seiten-Punkten (y nach unten) */
-  const pts = (d: ArrayLike<number>) => {
-    const out: [number, number][] = []
-    const m = mul(vt1, st.ctm)
-    for (let i = 0; i < d.length; ) {
-      const op = d[i]
-      if (op === 0 || op === 1) { out.push(ap(m, d[i + 1], d[i + 2])); i += 3 }
-      else if (op === 2) { out.push(ap(m, d[i + 5], d[i + 6])); i += 7 }
-      else if (op === 3) { out.push(ap(m, d[i + 3], d[i + 4])); i += 5 }
-      else i += 1
-    }
-    return out
-  }
-
   const isYellow = (c: string) => {
     const r = parseHex(c)
     return !!r && r[0] > 220 && r[1] > 200 && r[2] < 150 && r[0] - r[2] > 90

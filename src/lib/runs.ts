@@ -6,7 +6,7 @@ import { pointOnWall } from './geom'
 export const DEFAULT_RUN_PCT = 10
 export const DEFAULT_RUN_RESERVE = 1000
 
-export const isDist = (typeId: string) => typeId === 'hv' || typeId === 'uv'
+const isDist = (typeId: string) => typeId === 'hv' || typeId === 'uv'
 export const isRiser = (typeId: string) => typeId === 'steig'
 
 /** Braucht die Leitung zum Verteiler? KNX-geschaltete Leuchten/Lasten und KNX-Sensoren (Busleitung). */

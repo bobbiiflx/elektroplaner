@@ -23,7 +23,7 @@ export interface MatLine {
 export const DEFAULT_MATERIAL = { endMm: 100, wastePct: 5 }
 
 /** Richtwerte für Aktoren (€ netto je Gerät). */
-export const ACTUATOR_PRICE: Record<string, number> = {
+const ACTUATOR_PRICE: Record<string, number> = {
   'Schaltaktor 8-fach': 190,
   'Dimmaktor 4-fach (Phasen)': 240,
 }

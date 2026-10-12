@@ -9,7 +9,7 @@ import { findGap, type WallGap } from '../lib/gaps'
 import { roofAxes, roofContour, rectArea, rectCorners } from '../lib/roof'
 import { PlanOpening } from './OpeningGlyphs'
 import { openingDef, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
-import { useFloor, useStore } from '../store'
+import { useFloor, useStore, type Selection } from '../store'
 import type { CableNode, Floor, Vec2, Wall } from '../types'
 import {
   boundsOf,
@@ -17,7 +17,6 @@ import {
   dist,
   nearestWall,
   pointOnWall,
-  projectOnWall,
   uid,
   wallAngleDeg,
   wallLength,
@@ -831,7 +830,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: Selection) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -890,6 +889,18 @@ export default function Editor2D() {
       </g>
     )
   }
+
+  // Ausstattung je Raum nur neu rechnen, wenn sich Räume, Geräte, Wände oder Soll-Werte ändern (nicht beim Verschieben/Zoomen)
+  const roomBad = useMemo(() => {
+    const m = new Map<string, boolean>()
+    for (const rm of floor.rooms ?? []) {
+      const st = roomStats(floor, rm)
+      const req = roomReq(project, rm.type)
+      m.set(rm.id, st.sockets < req.sockets || st.lights < req.lights)
+    }
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floor.rooms, floor.devices, floor.walls, project.roomReq])
 
   const label = (text: string, x: number, y: number, rot = 0, color = 'var(--ink)') => {
     const flip = rot > 90 || rot < -90 ? rot + 180 : rot
@@ -1106,9 +1117,7 @@ export default function Editor2D() {
           {(floor.rooms ?? []).map((rm) => {
             const sel = selection?.kind === 'room' && selection.id === rm.id
             const c = polyCentroid(rm.poly)
-            const st = roomStats(floor, rm)
-            const req = roomReq(project, rm.type)
-            const bad = st.sockets < req.sockets || st.lights < req.lights
+            const bad = roomBad.get(rm.id) ?? false
             return (
               <g key={rm.id}>
                 <polygon points={rm.poly.map((q) => `${q.x},${q.y}`).join(' ')} fill={sel ? 'var(--accent)' : '#8e8e93'} fillOpacity={sel ? 0.14 : 0.06} style={{ pointerEvents: 'none' }} />

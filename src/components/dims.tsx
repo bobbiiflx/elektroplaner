@@ -143,9 +143,8 @@ export function PlanDims({ floor, unit, px, color = DIM_COLOR, cables = true }: 
 }
 
 /** Maßketten, Höhenkoten und Öffnungsmaße der Wandansicht. */
-export function ElevationDims({ wall, H, side, devices, openings, unit, px, kOf, typeOf, color = DIM_COLOR }: {
+export function ElevationDims({ wall, side, devices, openings, unit, px, kOf, typeOf, color = DIM_COLOR }: {
   wall: Wall
-  H: number
   side: 1 | -1
   devices: Device[]
   openings: Opening[]

@@ -756,7 +756,7 @@ export default function WallElevation() {
             )
           })}
 
-          {showDims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} />}
+          {showDims && <ElevationDims wall={wall} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} typeOf={(d) => resolveDevice(d, settings)} />}
 
           {/* Selbst gezeichnete Maßlinien */}
           {(floor.dims ?? [])

@@ -1,16 +1,17 @@
 import { Suspense, lazy, useEffect } from 'react'
 import AskDialog from './components/AskDialog'
 import Editor2D from './components/Editor2D'
-import ImportDialog from './components/ImportDialog'
-import WallDetectDialog from './components/WallDetectDialog'
 import Inspector from './components/Inspector'
 import SettingsDialog from './components/SettingsDialog'
-import SchrankDialog from './components/SchrankDialog'
 import ToolRail, { TOOLS } from './components/ToolRail'
 import TopBar from './components/TopBar'
 import WallElevation from './components/WallElevation'
 import SiteView from './components/SiteView'
 const PrintView = lazy(() => import('./components/PrintView'))
+// Selten genutzte Dialoge (u. a. PDF-Bibliothek) werden erst beim Öffnen geladen
+const ImportDialog = lazy(() => import('./components/ImportDialog'))
+const WallDetectDialog = lazy(() => import('./components/WallDetectDialog'))
+const SchrankDialog = lazy(() => import('./components/SchrankDialog'))
 import { useStore } from './store'
 
 const View3D = lazy(() => import('./components/View3D'))
@@ -27,6 +28,9 @@ export default function App() {
   const planPane = useStore((s) => s.planPane)
   const printOpen = useStore((s) => s.printOpen)
   const siteMode = useStore((s) => s.siteMode)
+  const importOpen = useStore((s) => !!s.importFile)
+  const wallDetectOpen = useStore((s) => s.wallDetectOpen)
+  const schrankOpen = useStore((s) => s.schrankOpen)
 
   useEffect(() => {
     void useStore.getState().init()
@@ -119,10 +123,12 @@ export default function App() {
           <Inspector />
         </aside>
       </div>
-      <ImportDialog />
-      <WallDetectDialog />
+      <Suspense fallback={null}>
+        {importOpen && <ImportDialog />}
+        {wallDetectOpen && <WallDetectDialog />}
+        {schrankOpen && <SchrankDialog />}
+      </Suspense>
       <SettingsDialog />
-      <SchrankDialog />
       <AskDialog />
       <Toast />
     </div>

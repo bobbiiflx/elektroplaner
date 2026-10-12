@@ -4,7 +4,7 @@ import { wallLength } from './geom'
 const rad = (d: number) => (d * Math.PI) / 180
 const TOL = 60 // mm Toleranz am Rand der Ebene (Wandenden)
 
-export function roofLength(r: RoofPlane): number {
+function roofLength(r: RoofPlane): number {
   return Math.hypot(r.b.x - r.a.x, r.b.y - r.a.y)
 }
 /** Einheitsvektor entlang der Linie und Normale zur Anstiegsseite */
@@ -15,7 +15,7 @@ export function roofAxes(r: RoofPlane): { u: Vec2; n: Vec2; L: number } {
 }
 
 /** Höhe der Ebene über OKFF an Punkt p; null, wenn p nicht im Wirkungsbereich liegt (Seite ohne Anstieg oder neben der Linie). */
-export function planeHeightAt(r: RoofPlane, p: Vec2): number | null {
+function planeHeightAt(r: RoofPlane, p: Vec2): number | null {
   const { u, n, L } = roofAxes(r)
   if (L < 1) return null
   const rx = p.x - r.a.x, ry = p.y - r.a.y
@@ -69,7 +69,7 @@ export function inRect(r: OrientedRect, p: Vec2, tol = 0): boolean {
 export const rectArea = (r: OrientedRect) => (rectAxes(r).L * r.depth) / 1e6 // m²
 export const rectWidth = (r: OrientedRect) => rectAxes(r).L
 
-export const hasRoof = (floor: Floor) => (floor.roofs?.length ?? 0) > 0 || (floor.dormers?.length ?? 0) > 0
+const hasRoof = (floor: Floor) => (floor.roofs?.length ?? 0) > 0 || (floor.dormers?.length ?? 0) > 0
 
 export interface ProfilePt { u: number; h: number }
 

@@ -66,7 +66,7 @@ const GA_RE = /^\d{1,2}\/\d{1,2}\/\d{1,3}$/
 export const isValidGA = (s: string) => !s.trim() || GA_RE.test(s.trim())
 
 /** Alle vergebenen Gruppenadressen (Schalten/Dimmen/Wert/Status). */
-export function allGAs(groups: Group[]): string[] {
+function allGAs(groups: Group[]): string[] {
   return groups.flatMap((g) => [g.ga, g.gaDim, g.gaValue, g.gaStatus]).filter((x): x is string => !!x && !!x.trim()).map((x) => x.trim())
 }
 

@@ -64,6 +64,9 @@ interface State {
   showDims: boolean
   colorBy: ColorBy
   printOpen: boolean
+  schrankOpen: boolean
+  inspectorTab: 'floor' | 'electric' | 'knx' | 'cabinet'
+  theme: 'system' | 'light' | 'dark'
   showAllFloors: boolean
   ghostWalls: boolean
   toast: string | null
@@ -91,6 +94,9 @@ interface State {
   toggleZones: () => void
   toggleDims: () => void
   setColorBy: (c: ColorBy) => void
+  setSchrankOpen: (v: boolean) => void
+  setInspectorTab: (t: 'floor' | 'electric' | 'knx' | 'cabinet') => void
+  setTheme: (t: 'system' | 'light' | 'dark') => void
   addCircuit: (partial?: Partial<Circuit>) => string
   addGroup: (partial?: Partial<Group>) => string
   addScene: () => string
@@ -126,6 +132,23 @@ interface State {
 const LAST_KEY = 'ep:last'
 const MAX_HISTORY = 100
 
+type Theme = 'system' | 'light' | 'dark'
+function readTheme(): Theme {
+  try {
+    const t = localStorage.getItem('ep:theme')
+    if (t === 'light' || t === 'dark') return t
+  } catch {
+    /* ignore */
+  }
+  return 'system'
+}
+function applyTheme(t: Theme) {
+  const el = document.documentElement
+  if (t === 'system') el.removeAttribute('data-theme')
+  else el.setAttribute('data-theme', t)
+}
+applyTheme(readTheme())
+
 const initial = sampleProject()
 
 let toastTimer: number | undefined
@@ -154,6 +177,9 @@ export const useStore = create<State>((set, get) => ({
   showDims: true,
   colorBy: 'type',
   printOpen: false,
+  schrankOpen: false,
+  inspectorTab: 'floor',
+  theme: readTheme(),
   showAllFloors: false,
   ghostWalls: false,
   toast: null,
@@ -226,6 +252,17 @@ export const useStore = create<State>((set, get) => ({
   toggleZones: () => set((s) => ({ showZones: !s.showZones })),
   toggleDims: () => set((s) => ({ showDims: !s.showDims })),
   setColorBy: (colorBy) => set({ colorBy }),
+  setSchrankOpen: (schrankOpen) => set({ schrankOpen }),
+  setInspectorTab: (inspectorTab) => set({ inspectorTab }),
+  setTheme: (theme) => {
+    applyTheme(theme)
+    try {
+      localStorage.setItem('ep:theme', theme)
+    } catch {
+      /* ignore */
+    }
+    set({ theme })
+  },
   addCircuit: (partial) => {
     const id = uid('c_')
     get().edit((p) => {

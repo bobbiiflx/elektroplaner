@@ -129,12 +129,27 @@ const BY_LABEL: { value: ColorBy; label: string }[] = [
   { value: 'control', label: 'Schaltung' },
 ]
 
+/** Färbung der Geräte im Plan (Typ / Stromkreis / Schaltung). */
+export function ColorByControl() {
+  const colorBy = useStore((s) => s.colorBy)
+  const setColorBy = useStore((s) => s.setColorBy)
+  return (
+    <>
+      <Segmented value={colorBy} onChange={setColorBy} options={BY_LABEL} />
+      {colorBy === 'control' && (
+        <p className="muted small">
+          <i className="cable-dot" style={{ background: '#ff9f0a' }} /> direkt · <i className="cable-dot" style={{ background: '#30d158' }} /> KNX · <i className="cable-dot" style={{ background: '#8e8e93' }} /> offen
+        </p>
+      )}
+      {colorBy !== 'type' && <p className="muted small">Gestrichelter Ring = Angaben fehlen noch.</p>}
+    </>
+  )
+}
+
 /** Elektro-Reiter: Darstellung, Stromkreisverwaltung, offene Punkte mit Sammelzuweisung. */
 export function ElectricOverview({ floor }: { floor: Floor }) {
   void floor
   const project = useStore((s) => s.project)
-  const colorBy = useStore((s) => s.colorBy)
-  const setColorBy = useStore((s) => s.setColorBy)
   const edit = useStore((s) => s.edit)
   const addCircuit = useStore((s) => s.addCircuit)
   const setActiveFloor = useStore((s) => s.setActiveFloor)
@@ -198,16 +213,6 @@ export function ElectricOverview({ floor }: { floor: Floor }) {
 
   return (
     <>
-      <Section title="Darstellung im Plan">
-        <Segmented value={colorBy} onChange={setColorBy} options={BY_LABEL} />
-        {colorBy === 'control' && (
-          <p className="muted small">
-            <i className="cable-dot" style={{ background: '#ff9f0a' }} /> direkt · <i className="cable-dot" style={{ background: '#30d158' }} /> KNX · <i className="cable-dot" style={{ background: '#8e8e93' }} /> offen
-          </p>
-        )}
-        {colorBy !== 'type' && <p className="muted small">Gestrichelter Ring = Angaben fehlen noch.</p>}
-      </Section>
-
       <Section
         title="Stromkreise"
         aside={

@@ -245,3 +245,26 @@ describe('Leitungswege', () => {
     expect(runSummary(p).perDist[0].runs).toBeGreaterThanOrEqual(1)
   })
 })
+
+import { actuatorChannels, actuatorNeeds, circuitRows, toCsv } from './schrank'
+describe('Schaltschrank-Listen', () => {
+  it('Kanäle je Gruppe × Stromkreis, Aktorbedarf, Stromkreislast, CSV', () => {
+    const p = sampleProject()
+    const eg = p.floors[0]
+    p.circuits = [{ id: 'c1', name: 'F1 Licht', rating: 16, charac: 'B', phase: 'L1', rcd: 'FI 1', color: '#fff' }]
+    p.groups = [{ id: 'g1', name: 'Decke', ga: '1/0/0' }, { id: 'g2', name: 'Wand', ga: '1/0/1' }]
+    eg.devices.push({ id: 'h', typeId: 'hv', wallId: 'w1', offset: 500, side: 1, height: 1500 })
+    const mk = (id: string, dim: boolean, g: string, w: number) => ({ id, typeId: 'l-decke', wallId: '', offset: 0, side: 1 as const, height: 2465, x: 2000, y: 2000, control: 'knx' as const, circuitId: 'c1', groupIds: [g], dimmable: dim, dimType: dim ? ('phase' as const) : undefined, powerW: w })
+    eg.devices.push(mk('a', true, 'g1', 100), mk('b', true, 'g1', 100), mk('c', false, 'g2', 4000))
+    const ch = actuatorChannels(p)
+    expect(ch).toHaveLength(2)
+    expect(ch.find((c) => c.kind === 'dim')!.devices).toBe(2)
+    expect(ch.find((c) => c.kind === 'switch')!.warn.join()).toContain('16 A')
+    const needs = actuatorNeeds(ch)
+    expect(needs.map((n) => n.units)).toEqual([1, 1])
+    const { rows } = circuitRows(p)
+    expect(rows[0].watts).toBe(4200)
+    expect(rows[0].warn.join()).toContain('Nennstrom')
+    expect(toCsv([['a;b', 'c"d', 1]])).toBe('"a;b";"c""d";1')
+  })
+})

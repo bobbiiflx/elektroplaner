@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, FolderOpen, Pencil, Plus, Printer, RulerDimensionLine, Redo2, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
+import { Check, ChevronDown, Download, Eye, FileOutput, FolderOpen, ImageUp, Monitor, Moon, Pencil, Plus, Printer, Redo2, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
 import { exportJson } from '../lib/storage'
 import { UNITS } from '../lib/units'
 import { useStore } from '../store'
 import { Segmented } from './ui'
+import { ColorByControl } from './ElectricPanel'
 
 function ProjectMenu() {
   const project = useStore((s) => s.project)
@@ -16,6 +17,7 @@ function ProjectMenu() {
   const importProjectText = useStore((s) => s.importProjectText)
   const edit = useStore((s) => s.edit)
   const showToast = useStore((s) => s.showToast)
+  const openImport = useStore((s) => s.openImport)
   const setAsk = useStore((s) => s.setAsk)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -101,6 +103,16 @@ function ProjectMenu() {
           </button>
           <button
             className="menu-action"
+            onClick={async () => {
+              setOpen(false)
+              const f = await pickFile('application/pdf,image/png,image/jpeg,image/webp')
+              if (f) openImport(f)
+            }}
+          >
+            <ImageUp size={15} /> Grundriss in dieses Geschoss laden …
+          </button>
+          <button
+            className="menu-action"
             onClick={() => {
               const safe = project.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '_').trim() || 'projekt'
               downloadText(`${safe}.elektroplaner.json`, exportJson(project, backgrounds))
@@ -131,24 +143,131 @@ function ProjectMenu() {
   )
 }
 
+function usePopover() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('pointerdown', h)
+    window.addEventListener('keydown', k)
+    return () => {
+      window.removeEventListener('pointerdown', h)
+      window.removeEventListener('keydown', k)
+    }
+  }, [open])
+  return { open, setOpen, ref }
+}
+
+/** „Ansicht“ (Auge): Layout, Einheit, Anzeige, Färbung und Erscheinungsbild an einer Stelle. */
+function ViewMenu() {
+  const { open, setOpen, ref } = usePopover()
+  const unit = useStore((s) => s.unit)
+  const setUnit = useStore((s) => s.setUnit)
+  const viewMode = useStore((s) => s.viewMode)
+  const setViewMode = useStore((s) => s.setViewMode)
+  const showDims = useStore((s) => s.showDims)
+  const toggleDims = useStore((s) => s.toggleDims)
+  const theme = useStore((s) => s.theme)
+  const setTheme = useStore((s) => s.setTheme)
+  return (
+    <div className="menu-wrap" ref={ref}>
+      <button className={'btn small' + (open ? ' on' : '')} onClick={() => setOpen(!open)} title="Ansicht">
+        <Eye size={15} /> Ansicht <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="menu glass menu-right view-menu">
+          <div className="menu-block">
+            <div className="menu-title">Fenster</div>
+            <Segmented
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: '2d', label: '2D' },
+                { value: 'split', label: 'Geteilt' },
+                { value: '3d', label: '3D' },
+              ]}
+            />
+          </div>
+          <div className="menu-block">
+            <div className="menu-title">Maßeinheit</div>
+            <Segmented value={unit} onChange={setUnit} options={UNITS.map((u) => ({ value: u, label: u }))} />
+          </div>
+          <div className="menu-block">
+            <div className="menu-title">Anzeige im Plan</div>
+            <label className="check">
+              <input type="checkbox" checked={showDims} onChange={toggleDims} /> Bemaßung zeigen
+            </label>
+            <ColorByControl />
+          </div>
+          <div className="menu-block">
+            <div className="menu-title">Erscheinungsbild</div>
+            <Segmented
+              value={theme}
+              onChange={setTheme}
+              options={[
+                { value: 'system', label: <Monitor size={14} />, title: 'Wie Browser / System' },
+                { value: 'light', label: <Sun size={14} />, title: 'Hell' },
+                { value: 'dark', label: <Moon size={14} />, title: 'Dunkel' },
+              ]}
+            />
+            <p className="muted small">{theme === 'system' ? 'Folgt dem Browser' : theme === 'light' ? 'Immer hell' : 'Immer dunkel'}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** „Ausgabe“: Druckansicht und Schaltschrank-Listen. */
+function OutputMenu() {
+  const { open, setOpen, ref } = usePopover()
+  const setPrintOpen = useStore((s) => s.setPrintOpen)
+  const setSchrankOpen = useStore((s) => s.setSchrankOpen)
+  return (
+    <div className="menu-wrap" ref={ref}>
+      <button className={'btn small' + (open ? ' on' : '')} onClick={() => setOpen(!open)} title="Ausgabe">
+        <FileOutput size={15} /> Ausgabe <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="menu glass menu-right">
+          <button
+            className="menu-action"
+            onClick={() => {
+              setOpen(false)
+              setPrintOpen(true)
+            }}
+          >
+            <Printer size={15} /> Druckansicht (Pläne, Maße, Checklisten)
+          </button>
+          <button
+            className="menu-action"
+            onClick={() => {
+              setOpen(false)
+              setSchrankOpen(true)
+            }}
+          >
+            <Table2 size={15} /> Schaltschrank-Listen
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TopBar() {
   const project = useStore((s) => s.project)
   const activeFloorId = useStore((s) => s.activeFloorId)
   const setActiveFloor = useStore((s) => s.setActiveFloor)
   const addFloor = useStore((s) => s.addFloor)
-  const unit = useStore((s) => s.unit)
-  const setUnit = useStore((s) => s.setUnit)
-  const viewMode = useStore((s) => s.viewMode)
-  const setViewMode = useStore((s) => s.setViewMode)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const setSettingsOpen = useStore((s) => s.setSettingsOpen)
-  const setPrintOpen = useStore((s) => s.setPrintOpen)
-  const showDims = useStore((s) => s.showDims)
-  const toggleDims = useStore((s) => s.toggleDims)
-  const openImport = useStore((s) => s.openImport)
 
   return (
     <header className="topbar glass">
@@ -167,37 +286,9 @@ export default function TopBar() {
 
       <div className="spacer" />
 
-      <button
-        className="btn small"
-        onClick={async () => {
-          const f = await pickFile('application/pdf,image/png,image/jpeg,image/webp')
-          if (f) openImport(f)
-        }}
-      >
-        <Upload size={14} /> Grundriss
-      </button>
-
-      <button className={'btn small' + (showDims ? ' primary' : '')} onClick={toggleDims} title="Bemaßung ein-/ausblenden">
-        <RulerDimensionLine size={14} /> Maße
-      </button>
-      <button className="btn small" onClick={() => setPrintOpen(true)} title="Druckansicht mit Bemaßung und Checklisten">
-        <Printer size={14} /> Drucken
-      </button>
-
-      <Segmented
-        value={unit}
-        onChange={setUnit}
-        options={UNITS.map((u) => ({ value: u, label: u }))}
-      />
-      <Segmented
-        value={viewMode}
-        onChange={setViewMode}
-        options={[
-          { value: '2d', label: '2D' },
-          { value: 'split', label: 'Geteilt' },
-          { value: '3d', label: '3D' },
-        ]}
-      />
+      <ViewMenu />
+      <OutputMenu />
+      <span className="vsep" />
 
       <div className="btn-group">
         <button className="icon-btn" title="Rückgängig (⌘Z)" disabled={!canUndo} onClick={undo}>

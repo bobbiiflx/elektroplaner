@@ -513,8 +513,26 @@ function FloorPanel({ floor }: { floor: Floor }) {
     if (f) openImport(f)
   }
 
+  const tab = useStore((s) => s.inspectorTab)
+  const setTab = useStore((s) => s.setInspectorTab)
+  const setSchrankOpen = useStore((s) => s.setSchrankOpen)
+
   return (
     <div className="inspector-body">
+      <div className="inspector-tabs">
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'floor', label: 'Geschoss' },
+            { value: 'electric', label: 'Elektro' },
+            { value: 'knx', label: 'KNX' },
+            { value: 'cabinet', label: 'Schrank' },
+          ]}
+        />
+      </div>
+      {tab === 'floor' && (
+      <>
       <Section title="Geschoss">
         <Row label="Name">
           <input
@@ -571,10 +589,6 @@ function FloorPanel({ floor }: { floor: Floor }) {
         )}
       </Section>
 
-      <ElectricOverview floor={floor} />
-      <GroupsOverview />
-      <DistOverview />
-
       <Section title="Übersicht">
         <p className="muted small">
           {floor.walls.length} Wände · {floor.openings.length} Öffnungen · {floor.devices.length} Geräte · {floor.cables.length} Leitungen
@@ -602,6 +616,20 @@ function FloorPanel({ floor }: { floor: Floor }) {
             <Trash2 size={15} /> Geschoss löschen
           </button>
         </div>
+      )}
+      </>
+      )}
+      {tab === 'electric' && <ElectricOverview floor={floor} />}
+      {tab === 'knx' && <GroupsOverview />}
+      {tab === 'cabinet' && (
+        <>
+          <DistOverview />
+          <div className="section">
+            <button className="btn primary block" onClick={() => setSchrankOpen(true)}>
+              Schaltschrank-Listen öffnen
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

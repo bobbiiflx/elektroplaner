@@ -3,49 +3,82 @@
   --canvas: #fbfbfd;
   --paper: #ffffff;
   --ink: #1d1d1f;
-  --ink-soft: #6e6e73;
-  --line: rgba(0, 0, 0, 0.1);
+  --ink-soft: #636368;
+  --line: rgba(0, 0, 0, 0.12);
   --accent: #0071e3;
+  --accent-ink: #0062c4;
   --accent-soft: rgba(0, 113, 227, 0.12);
-  --glass: rgba(255, 255, 255, 0.74);
+  --glass: rgba(255, 255, 255, 0.78);
   --wall: #3a3a3c;
   --grid-minor: rgba(0, 0, 0, 0.055);
   --grid-major: rgba(0, 0, 0, 0.14);
   --danger: #d70015;
   --ok: #1d8a3a;
-  --warn: #b25000;
+  --warn: #a14600;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   --radius: 12px;
-  --field: rgba(0, 0, 0, 0.05);
+  --field: rgba(0, 0, 0, 0.06);
   --plate: #fbfbfd;
+  --dim: #0062c4;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #1c1c1e;
     --canvas: #161618;
     --paper: #2c2c2e;
     --ink: #f5f5f7;
-    --ink-soft: #98989d;
-    --line: rgba(255, 255, 255, 0.13);
+    --ink-soft: #b4b4ba;
+    --line: rgba(255, 255, 255, 0.16);
     --accent: #0a84ff;
-    --accent-soft: rgba(10, 132, 255, 0.2);
-    --glass: rgba(44, 44, 46, 0.74);
+    --accent-ink: #6cb4ff;
+    --accent-soft: rgba(10, 132, 255, 0.24);
+    --glass: rgba(44, 44, 46, 0.82);
     --wall: #d1d1d6;
     --grid-minor: rgba(255, 255, 255, 0.06);
     --grid-major: rgba(255, 255, 255, 0.16);
-    --danger: #ff453a;
+    --danger: #ff6961;
     --ok: #30d158;
-    --warn: #ff9f0a;
+    --warn: #ffb340;
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-    --field: rgba(255, 255, 255, 0.09);
+    --field: rgba(255, 255, 255, 0.11);
     --plate: #3a3a3c;
+    --dim: #64b0ff;
+    color-scheme: dark;
   }
+}
+:root[data-theme='dark'] {
+    --bg: #1c1c1e;
+    --canvas: #161618;
+    --paper: #2c2c2e;
+    --ink: #f5f5f7;
+    --ink-soft: #b4b4ba;
+    --line: rgba(255, 255, 255, 0.16);
+    --accent: #0a84ff;
+    --accent-ink: #6cb4ff;
+    --accent-soft: rgba(10, 132, 255, 0.24);
+    --glass: rgba(44, 44, 46, 0.82);
+    --wall: #d1d1d6;
+    --grid-minor: rgba(255, 255, 255, 0.06);
+    --grid-major: rgba(255, 255, 255, 0.16);
+    --danger: #ff6961;
+    --ok: #30d158;
+    --warn: #ffb340;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    --field: rgba(255, 255, 255, 0.11);
+    --plate: #3a3a3c;
+    --dim: #64b0ff;
+    color-scheme: dark;
+}
+
+select option {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 * {
@@ -143,7 +176,7 @@ button {
 }
 .floor-tab.on {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 .floor-add {
@@ -248,7 +281,7 @@ button {
   filter: brightness(0.97);
 }
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: default;
 }
 .btn.small {
@@ -1119,3 +1152,28 @@ p {
 .run-table th{text-align:left;font-weight:600;color:var(--muted,#8e8e93);padding:2px 4px}
 .run-table td{padding:3px 4px;border-top:1px solid rgba(128,128,128,.2)}
 .run-table th:nth-child(n+2),.run-table td:nth-child(n+2){text-align:right}
+
+/* --- Ansicht-/Ausgabe-Menüs, Reiter, Tabellen ------------------------------ */
+.menu-right{left:auto;right:0}
+.view-menu{min-width:300px;padding:10px;display:flex;flex-direction:column;gap:12px}
+.menu-block{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.menu-block .menu-title{padding:0}
+.menu-block .seg{align-self:stretch}
+.menu-block .seg button{flex:1}
+.btn.on{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.vsep{width:1px;height:22px;background:var(--line);margin:0 2px}
+.inspector-tabs{position:sticky;top:0;z-index:2;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--line)}
+.inspector-tabs .seg{display:flex}
+.inspector-tabs .seg button{flex:1;padding:5px 4px}
+.schrank-tabs{margin-bottom:12px}
+.schrank-table{margin-top:14px}
+.schrank-table h3{margin:0 0 6px;font-size:13px;letter-spacing:.02em}
+.table-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:46vh}
+.data-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.data-table th{position:sticky;top:0;background:var(--paper);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink-soft)}
+.data-table td{padding:6px 10px;border-top:1px solid var(--line);vertical-align:top}
+.data-table tr.warn-row td:last-child{color:var(--warn);font-weight:600}
+.menu.glass{background:var(--paper)}
+.menu .seg button.on{background:var(--accent);color:#fff;box-shadow:none}
+.view-menu{min-width:340px}
+.menu-block .seg button{white-space:nowrap;padding:5px 8px}

@@ -4,6 +4,7 @@ import Editor2D from './components/Editor2D'
 import ImportDialog from './components/ImportDialog'
 import Inspector from './components/Inspector'
 import SettingsDialog from './components/SettingsDialog'
+import SchrankDialog from './components/SchrankDialog'
 import ToolRail, { TOOLS } from './components/ToolRail'
 import TopBar from './components/TopBar'
 import WallElevation from './components/WallElevation'
@@ -106,6 +107,7 @@ export default function App() {
       </div>
       <ImportDialog />
       <SettingsDialog />
+      <SchrankDialog />
       <AskDialog />
       <Toast />
     </div>

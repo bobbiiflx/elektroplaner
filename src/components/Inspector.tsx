@@ -13,7 +13,6 @@ import {
 } from '../config/catalog'
 import { cableLengths, clamp, wallLength } from '../lib/geom'
 import { pickFile } from '../lib/files'
-import { detectWallsRGBA } from '../lib/detectWalls'
 import { alignToReference, riserChecks } from '../lib/stack'
 import { setWallLength, syncDeviceNodes } from '../lib/link'
 import { formatLen } from '../lib/units'
@@ -525,35 +524,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
   const bgUrl = useStore((s) => s.backgrounds[floor.id])
   const setSuggest = useStore((s) => s.setSuggest)
   const showToast = useStore((s) => s.showToast)
-  const detect = async () => {
-    if (!bg || !bgUrl) return
-    try {
-      const img = new Image()
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res()
-        img.onerror = () => rej(new Error('Bild nicht lesbar'))
-        img.src = bgUrl
-      })
-      const c = document.createElement('canvas')
-      c.width = img.naturalWidth
-      c.height = img.naturalHeight
-      const ctx = c.getContext('2d', { willReadFrequently: true })!
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(0, 0, c.width, c.height)
-      ctx.drawImage(img, 0, 0)
-      const d = ctx.getImageData(0, 0, c.width, c.height).data
-      const walls = detectWallsRGBA(d, c.width, c.height, bg.mmPerPx)
-      if (!walls.length) {
-        showToast('Keine Wände erkannt – Plan zu unsauber oder Maßstab prüfen')
-        return
-      }
-      const ox = bg.x ?? 0, oy = bg.y ?? 0
-      setSuggest({ floorId: floor.id, walls: walls.map((w) => ({ ...w, a: { x: w.a.x + ox, y: w.a.y + oy }, b: { x: w.b.x + ox, y: w.b.y + oy } })) })
-      setTool('select')
-    } catch {
-      showToast('Erkennung fehlgeschlagen')
-    }
-  }
+  const setWallDetectOpen = useStore((s) => s.setWallDetectOpen)
 
   const tab = useStore((s) => s.inspectorTab)
   const setTab = useStore((s) => s.setInspectorTab)
@@ -674,7 +645,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
                 Entfernen
               </button>
             </div>
-            <button className="btn block" onClick={detect} title="Erkennt waagerechte/senkrechte Wände (schwarz, schraffiert, rot umrandet; gelb wird ignoriert) als Vorschlag – nach dem Kalibrieren">
+            <button className="btn block" onClick={() => setWallDetectOpen(true)} title="Erkennt waagerechte/senkrechte Wände (schwarz, schraffiert, rot umrandet; gelb wird ignoriert) als Vorschlag – nach dem Kalibrieren">
               Wände erkennen
             </button>
           </>

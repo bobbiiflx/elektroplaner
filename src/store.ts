@@ -55,6 +55,8 @@ interface State {
   metas: ProjectMeta[]
   project: Project
   backgrounds: Record<string, string>
+  wallDetectOpen: boolean
+  setWallDetectOpen: (v: boolean) => void
   ghostBelow: boolean
   setGhostBelow: (v: boolean) => void
   addSheetFloors: (items: { name: string; dataUrl: string; bg: Background }[]) => string[]
@@ -180,6 +182,8 @@ export const useStore = create<State>((set, get) => ({
   project: initial,
   backgrounds: {},
   suggest: null,
+  wallDetectOpen: false,
+  setWallDetectOpen: (v) => set({ wallDetectOpen: v }),
   ghostBelow: false,
   setGhostBelow: (v) => set({ ghostBelow: v }),
   activeFloorId: initial.floors[0].id,

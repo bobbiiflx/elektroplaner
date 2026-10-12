@@ -12,6 +12,43 @@ export interface DetectOpts {
   minLength?: number // mm
   maxGap?: number // mm, Lücken (Türen) werden überbrückt
   cell?: number // mm Arbeitsraster
+  hatch?: number // mm: Schraffurabstand, der zu einer Fläche geschlossen wird
+}
+
+export type ClassMode = 'wall' | 'outline' | 'ignore'
+export interface ColorClass {
+  id: string
+  name: string
+  kind: 'dark' | 'color'
+  rgb?: [number, number, number]
+  tol: number // dark: Helligkeitsschwelle 0–255, color: Farbabstand
+  mode: ClassMode // Wand (gefüllt/schraffiert) · Wand-Umriss (umrandete Fläche) · Ignorieren
+  on: boolean
+  custom?: boolean
+}
+
+export const DEFAULT_CLASSES: ColorClass[] = [
+  { id: 'yellow', name: 'Gelb (alte Wände)', kind: 'color', rgb: [255, 225, 0], tol: 100, mode: 'ignore', on: true },
+  { id: 'red', name: 'Rot (umrandet)', kind: 'color', rgb: [220, 30, 30], tol: 110, mode: 'outline', on: true },
+  { id: 'dark', name: 'Schwarz / dunkel', kind: 'dark', tol: 110, mode: 'wall', on: true },
+]
+
+/** Pixelklassen: 1 = Wand, 2 = Umriss, 3 = ignorieren, 0 = sonst. Erste passende aktive Klasse gewinnt. */
+export function classifyPixels(d: ArrayLike<number>, n: number, classes: ColorClass[]): Uint8Array {
+  const cls = new Uint8Array(n)
+  const act = classes.filter((c) => c.on).map((c) => ({ ...c, code: c.mode === 'wall' ? 1 : c.mode === 'outline' ? 2 : 3, t2: c.tol * c.tol }))
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2]
+    for (const c of act) {
+      if (c.kind === 'dark') {
+        if (r * 0.299 + g * 0.587 + b * 0.114 <= c.tol && Math.max(r, g, b) - Math.min(r, g, b) < 70) { cls[i] = c.code; break }
+      } else if (c.rgb) {
+        const dr = r - c.rgb[0], dg = g - c.rgb[1], db = b - c.rgb[2]
+        if (dr * dr + dg * dg + db * db <= c.t2) { cls[i] = c.code; break }
+      }
+    }
+  }
+  return cls
 }
 
 export function otsu(gray: Uint8Array): number {
@@ -115,20 +152,6 @@ function bands(mask: Uint8Array, w: number, h: number, horiz: boolean, maxT: num
   return res
 }
 
-/** Pixelklassen: 1 = dunkle Tinte (schwarz/grau), 2 = rot, 3 = gelb, 0 = sonst. */
-export function classifyRGBA(d: ArrayLike<number>, n: number): Uint8Array {
-  const cls = new Uint8Array(n)
-  for (let i = 0; i < n; i++) {
-    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2]
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
-    const lum = r * 0.299 + g * 0.587 + b * 0.114
-    if (r > 100 && r > 1.6 * g && r > 1.6 * b) cls[i] = 2
-    else if (r > 190 && g > 170 && b < 150 && r - b > 70) cls[i] = 3
-    else if (lum < 110 && mx - mn < 70) cls[i] = 1
-  }
-  return cls
-}
-
 /** Graustufen-Variante (nur schwarze Wände). */
 export function detectWalls(gray: Uint8Array, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
   const thr = otsu(gray)
@@ -138,8 +161,8 @@ export function detectWalls(gray: Uint8Array, width: number, height: number, mmP
 }
 
 /** Farbige Pläne: schwarz/schraffiert und rot umrandete Flächen = Wände, gelbe Flächen = alte Wände (ignoriert). */
-export function detectWallsRGBA(rgba: ArrayLike<number>, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
-  return detectWallsCls(classifyRGBA(rgba, width * height), width, height, mmPerPx, opts)
+export function detectWallsRGBA(rgba: ArrayLike<number>, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}, classes: ColorClass[] = DEFAULT_CLASSES): DetectedWall[] {
+  return detectWallsCls(classifyPixels(rgba, width * height, classes), width, height, mmPerPx, opts)
 }
 
 export function detectWallsCls(cls: Uint8Array, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
@@ -172,7 +195,7 @@ export function detectWallsCls(cls: Uint8Array, width: number, height: number, m
     }
 
   const rOpen = Math.max(1, Math.floor(minT / cmm / 2))
-  const rClose = Math.max(2, Math.round(125 / cmm))
+  const rClose = Math.max(2, Math.round((opts.hatch ?? 150) / 2 / cmm))
   // schwarze / schraffierte Wände: Schraffur schließen, dünne Linien öffnen, gelbe Flächen ausnehmen
   const hatched = closeSym(ink, w, h, rClose)
   for (let i = 0; i < hatched.length; i++) if (solid[i]) hatched[i] = 1

@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react'
 import AskDialog from './components/AskDialog'
 import Editor2D from './components/Editor2D'
 import ImportDialog from './components/ImportDialog'
+import WallDetectDialog from './components/WallDetectDialog'
 import Inspector from './components/Inspector'
 import SettingsDialog from './components/SettingsDialog'
 import SchrankDialog from './components/SchrankDialog'
@@ -106,6 +107,7 @@ export default function App() {
         </aside>
       </div>
       <ImportDialog />
+      <WallDetectDialog />
       <SettingsDialog />
       <SchrankDialog />
       <AskDialog />

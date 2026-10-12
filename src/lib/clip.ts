@@ -3,7 +3,7 @@ import { rectCorners } from './roof'
 import { planPoint } from './runs'
 import { uid } from './geom'
 
-export type SelKind = 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'
+export type SelKind = 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room'
 export interface Sel {
   kind: SelKind
   id: string

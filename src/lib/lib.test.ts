@@ -558,3 +558,27 @@ describe('Material: Händler, Verschnitt, Varianten', () => {
     expect(groups.some((g) => g.supplier === 'Elektro-Großhandel')).toBe(true)
   })
 })
+
+import { detectRoom, polyArea, roomIssues, roomStats } from './rooms'
+describe('Räume', () => {
+  it('erkennt Raum aus Wänden, Fläche stimmt, offene Räume werden abgelehnt, Ausstattung gezählt', () => {
+    const f = newFloor(DEFAULT_SETTINGS, 'EG')
+    const mk = (id: string, a: [number, number], b: [number, number]) => ({ id, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, thickness: 200, kind: 'inner' as const })
+    f.walls = [mk('a', [0, 0], [4000, 0]), mk('b', [4000, 0], [4000, 3000]), mk('c', [4000, 3000], [0, 3000]), mk('d', [0, 3000], [0, 0])]
+    const poly = detectRoom(f, { x: 2000, y: 1500 })!
+    expect(poly).toBeTruthy()
+    expect(polyArea(poly)).toBeCloseTo(3.8 * 2.8, 0) // Innenmaß
+    expect(poly.length).toBe(4)
+    f.walls = f.walls.slice(0, 3)
+    expect(detectRoom(f, { x: 2000, y: 1500 })).toBeNull()
+    f.walls = [mk('a', [0, 0], [4000, 0]), mk('b', [4000, 0], [4000, 3000]), mk('c', [4000, 3000], [0, 3000]), mk('d', [0, 3000], [0, 0])]
+    f.rooms = [{ id: 'r', name: 'Wohnen', type: 'living', poly }]
+    f.devices = [{ id: 'd1', typeId: 'sd-2', wallId: 'a', offset: 1000, side: 1, height: 300 } as never, { id: 'd2', typeId: 'sw-1', wallId: 'a', offset: 500, side: 1, height: 1050 } as never]
+    const st = roomStats(f, f.rooms[0])
+    expect(st.sockets).toBe(2)
+    expect(st.switches).toBe(1)
+    const p = sampleProject()
+    p.floors = [f]
+    expect(roomIssues(p).some((i) => i.text.includes('Steckdosen'))).toBe(true)
+  })
+})

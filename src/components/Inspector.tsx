@@ -25,7 +25,9 @@ import { Row, Section, Segmented } from './ui'
 import { OPENING_TYPES, openingDef } from '../config/catalog'
 import { planChecks } from '../lib/checks'
 import { loggiaNotes, rectArea, rectWidth, roofContour, roofIssues } from '../lib/roof'
-import type { Dormer, Loggia, RoofPlane, Skylight } from '../types'
+import type { Dormer, Loggia, Room, RoofPlane, Skylight } from '../types'
+import { ROOM_TYPES, roomReq } from '../config/rooms'
+import { polyArea, roomStats } from '../lib/rooms'
 import { OpeningIcon } from './OpeningGlyphs'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
@@ -112,6 +114,9 @@ export default function Inspector() {
   } else if (selection?.kind === 'loggia') {
     const l = (floor.loggias ?? []).find((x) => x.id === selection.id)
     body = l ? <LoggiaPanel loggia={l} /> : null
+  } else if (selection?.kind === 'room') {
+    const rm = (floor.rooms ?? []).find((x) => x.id === selection.id)
+    body = rm ? <RoomPanel room={rm} floor={floor} /> : null
   } else if (selection?.kind === 'skylight') {
     const k = (floor.skylights ?? []).find((x) => x.id === selection.id)
     body = k ? <SkylightPanel sky={k} /> : null
@@ -129,7 +134,7 @@ export default function Inspector() {
     )
   if (!body) return <FloorPanel floor={floor} />
 
-  const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia' || selection?.kind === 'skylight'
+  const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia' || selection?.kind === 'skylight' || selection?.kind === 'room'
   return (
     <div className="inspector-body">
       <InspectorTabs />
@@ -487,6 +492,54 @@ function DormerPanel({ dormer, floor }: { dormer: Dormer; floor: Floor }) {
   )
 }
 
+function RoomPanel({ room, floor }: { room: Room; floor: Floor }) {
+  const editFloor = useEditFloor()
+  const edit = useStore((s) => s.edit)
+  const project = useStore((s) => s.project)
+  const upd = (fn: (r: Room) => void, key?: string) =>
+    editFloor((f) => {
+      const r = (f.rooms ?? []).find((x) => x.id === room.id)
+      if (r) fn(r)
+    }, key)
+  const req = roomReq(project, room.type)
+  const st = roomStats(floor, room)
+  const row = (label: string, have: number, need: number | null) => (
+    <Row label={label}>
+      <b style={{ color: need !== null && have < need ? 'var(--danger)' : undefined }}>
+        {have}
+        {need !== null ? ` von ${need}` : ''}
+      </b>
+    </Row>
+  )
+  return (
+    <Section title="Raum">
+      <Row label="Name">
+        <input className="text" value={room.name} onChange={(e) => upd((r) => void (r.name = e.target.value), `rn:${room.id}`)} />
+      </Row>
+      <Row label="Raumart">
+        <select className="text" value={room.type} onChange={(e) => upd((r) => void (r.type = e.target.value as Room['type']))}>
+          {ROOM_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+      </Row>
+      <Row label="Fläche">
+        <b>{polyArea(room.poly).toFixed(2).replace('.', ',')} m²</b>
+      </Row>
+      {row('Steckdosen', st.sockets, req.sockets)}
+      {row('Lichtauslässe', st.lights, req.lights)}
+      {row('Schalter/Taster', st.switches, st.lights > 0 ? 1 : null)}
+      <Row label="Soll anpassen" hint="für diese Raumart">
+        <span style={{ display: 'flex', gap: 6 }}>
+          <NumberField value={req.sockets} decimals={0} min={0} max={30} suffix="Steckd." onCommit={(v) => edit((p) => void ((p.roomReq ??= {})[room.type] = { ...req, sockets: v }))} />
+          <NumberField value={req.lights} decimals={0} min={0} max={30} suffix="Licht" onCommit={(v) => edit((p) => void ((p.roomReq ??= {})[room.type] = { ...req, lights: v }))} />
+        </span>
+      </Row>
+      <p className="muted small">Geräte zählen zum Raum, an dessen Wandseite oder Fläche sie sitzen. Steckdosen: 2-fach = 2. Soll-Werte sind Richtwerte nach DIN 18015-2 (Mindestausstattung) und hier anpassbar.</p>
+    </Section>
+  )
+}
+
 function SkylightPanel({ sky }: { sky: Skylight }) {
   const editFloor = useEditFloor()
   const upd = (fn: (k: Skylight) => void, key?: string) =>
@@ -753,6 +806,17 @@ function BuildSections({ floor }: { floor: Floor }) {
   const select = useStore((s) => s.select)
   return (
     <>
+      <Section title="Räume">
+        {(floor.rooms ?? []).length === 0 && <p className="muted small">In einen geschlossenen Raum klicken: Fläche und Ausstattung (Steckdosen, Licht) werden geprüft.</p>}
+        {(floor.rooms ?? []).map((r) => (
+          <button key={r.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'room', id: r.id })}>
+            {r.name} · {polyArea(r.poly).toFixed(1).replace('.', ',')} m² · {roomStats(floor, r).sockets} Steckd. · {roomStats(floor, r).lights} Licht
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('room')}>
+          Raum festlegen
+        </button>
+      </Section>
       <Section title="Dachschrägen">
         {(floor.roofs ?? []).length === 0 && <p className="muted small">Für Dachgeschosse: Linie ziehen, an der die Schräge beginnt (Kniestock), dann die Neigung einstellen. Wände werden schräg abgeschnitten, über der Schräge ist keine Wand.</p>}
         {(floor.roofs ?? []).map((r, i) => (
@@ -840,7 +904,7 @@ function InspectorTabs() {
     useStore.getState().setPickerOpen(false)
     // Bau-Werkzeug beenden, wenn man zu den Elektro-Tabs wechselt
     const st = useStore.getState()
-    if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia', 'skylight'].includes(st.tool)) st.setTool('select')
+    if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia', 'skylight', 'room'].includes(st.tool)) st.setTool('select')
     setTab(t)
   }
   return (

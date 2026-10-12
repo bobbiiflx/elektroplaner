@@ -1,6 +1,8 @@
 import { planPoint } from '../lib/runs'
 import { selectInRect } from '../lib/clip'
 import { roofPlaneAt, skylightGeometry } from '../lib/roof'
+import { detectRoom, polyArea, polyCentroid, roomStats } from '../lib/rooms'
+import { roomReq } from '../config/rooms'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { findGap, type WallGap } from '../lib/gaps'
@@ -65,6 +67,7 @@ const HINTS: Record<string, string> = {
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
   roof: 'Dachschräge: 1. und 2. Klick = Linie, an der die Schräge beginnt (Kniestock/Traufe) · 3. Klick = Seite, zu der sie ansteigt (in den Raum)',
   dormer: 'Gaube: 1. und 2. Klick = Gaubenfront (Außenkante) · 3. Klick = Tiefe in den Raum (zieht die Rechteckfläche auf)',
+  room: 'Raum festlegen: in einen geschlossenen Raum klicken – Fläche und Ausstattung werden erkannt (Wände müssen den Raum umschließen)',
   skylight: 'Dachflächenfenster: in die Dachschräge klicken (Mitte des Fensters) · danach Größe rechts einstellen',
   loggia: 'Loggia: 1. und 2. Klick = offene Seite (Brüstung) · 3. Klick = Tiefe in den Raum',
   anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
@@ -628,6 +631,22 @@ export default function Editor2D() {
       case 'loggia':
         addRoofPoint(raw, orthoNow)
         break
+      case 'room': {
+        const poly = detectRoom(floor, raw)
+        if (!poly) {
+          showToast('Kein geschlossener Raum an dieser Stelle – Wände müssen den Raum vollständig umschließen (Türen/Lücken mit Wand schließen).')
+          break
+        }
+        const id = uid('rm_')
+        const n = (floor.rooms?.length ?? 0) + 1
+        edit((p) => {
+          const f = p.floors.find((x) => x.id === floor.id)
+          if (f) (f.rooms ??= []).push({ id, name: `Raum ${n}`, type: 'other', poly })
+        })
+        select({ kind: 'room', id })
+        showToast('Raum angelegt – Name und Raumart stehen rechts.')
+        break
+      }
       case 'skylight': {
         const r = roofPlaneAt(floor, raw)
         if (!r) {
@@ -812,7 +831,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -1079,6 +1098,28 @@ export default function Editor2D() {
                 <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#0a84ff'} strokeWidth={px(sel ? 3 : 1.6)} strokeDasharray={`${px(3)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'loggia', id: l.id, start: toPlan(e.clientX, e.clientY), a0: { ...l.a }, b0: { ...l.b } }, { kind: 'loggia', id: l.id })} />
                 {sel && tool === 'select' && shapeHandles('loggia', l.id, l.a, l.b, rectCorners(l))}
                 {label(`Loggia · ${rectArea(l).toFixed(1).replace('.', ',')} m²`, mid.x, mid.y, 0, '#0a6fd0')}
+              </g>
+            )
+          })}
+
+          {/* Räume (unter den Wänden; nur das Namensschild ist klickbar) */}
+          {(floor.rooms ?? []).map((rm) => {
+            const sel = selection?.kind === 'room' && selection.id === rm.id
+            const c = polyCentroid(rm.poly)
+            const st = roomStats(floor, rm)
+            const req = roomReq(project, rm.type)
+            const bad = st.sockets < req.sockets || st.lights < req.lights
+            return (
+              <g key={rm.id}>
+                <polygon points={rm.poly.map((q) => `${q.x},${q.y}`).join(' ')} fill={sel ? 'var(--accent)' : '#8e8e93'} fillOpacity={sel ? 0.14 : 0.06} style={{ pointerEvents: 'none' }} />
+                <g
+                  style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }}
+                  onPointerDown={(e) => beginElementDrag(e, null, { kind: 'room', id: rm.id })}
+                >
+                  <rect x={c.x - px(46)} y={c.y - px(14)} width={px(92)} height={px(28)} fill="transparent" />
+                  {label(rm.name, c.x, c.y - px(6), 0, sel ? 'var(--accent)' : 'var(--ink)')}
+                  {label(`${polyArea(rm.poly).toFixed(1).replace('.', ',')} m²${bad ? ' · ⚠' : ''}`, c.x, c.y + px(8), 0, bad ? '#d70015' : 'var(--ink-soft)')}
+                </g>
               </g>
             )
           })}

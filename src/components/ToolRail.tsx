@@ -20,6 +20,13 @@ const DormerIcon = ({ size = 19 }: { size?: number }) => (
     <path d="M7.5 15h9" />
   </svg>
 )
+/** Symbol: Raum (Grundfläche mit Beschriftung) */
+const RoomIcon = ({ size = 19 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16v16H4z" />
+    <path d="M9 12h6M12 9v6" />
+  </svg>
+)
 /** Symbol: Dachflächenfenster (Fenster in der Schräge) */
 const SkylightIcon = ({ size = 19 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -40,6 +47,7 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: ReactNode; gro
   { id: 'select', label: 'Auswählen', key: 'V', icon: <MousePointer2 size={19} /> },
   { id: 'wall', label: 'Wand zeichnen', key: 'W', icon: <BrickWall size={19} />, group: 'build' },
   { id: 'opening', label: 'Tür / Fenster / Hebe-Schiebetür', key: 'O', icon: <DoorOpen size={19} />, group: 'build' },
+  { id: 'room', label: 'Raum festlegen (Klick in den Raum)', key: 'N', icon: <RoomIcon />, group: 'build' },
   { id: 'roof', label: 'Dachschräge zeichnen', key: 'R', icon: <RoofIcon />, group: 'build' },
   { id: 'dormer', label: 'Gaube zeichnen', key: 'G', icon: <DormerIcon />, group: 'build' },
   { id: 'skylight', label: 'Dachflächenfenster setzen', key: 'S', icon: <SkylightIcon />, group: 'build' },

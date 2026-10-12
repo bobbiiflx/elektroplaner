@@ -21,8 +21,8 @@ import { uid } from './lib/geom'
 import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 
-const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'roof', 'dormer', 'loggia', 'skylight', 'calibrate', 'anchor']
-export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
+const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'room', 'roof', 'dormer', 'loggia', 'skylight', 'calibrate', 'anchor']
+export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
 export type ViewMode = 'split' | '2d' | '3d'
 
 export interface AskDialog {
@@ -36,7 +36,7 @@ export interface AskDialog {
 }
 
 export interface Selection {
-  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'
+  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room'
   id: string
 }
 
@@ -669,6 +669,8 @@ export const useStore = create<State>((set, get) => ({
         f.dormers = (f.dormers ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'loggia') {
         f.loggias = (f.loggias ?? []).filter((r) => r.id !== selection.id)
+      } else if (selection.kind === 'room') {
+        f.rooms = (f.rooms ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'skylight') {
         f.skylights = (f.skylights ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'dim') {
@@ -704,6 +706,8 @@ function fixSelection() {
                 ? (floor.loggias ?? [])
                 : selection.kind === 'skylight'
                 ? (floor.skylights ?? [])
+                : selection.kind === 'room'
+                ? (floor.rooms ?? [])
             : selection.kind === 'dim'
               ? (floor.dims ?? [])
               : floor.cables

@@ -3,6 +3,7 @@ import type { Project } from '../types'
 import { cableLengths } from './geom'
 import { loggiaNotes, roofIssues } from './roof'
 import { evaluate } from './vde'
+import { roomIssues } from './rooms'
 
 export type Selectable = { kind: 'device' | 'cable'; id: string }
 export interface PlanCheck {
@@ -36,6 +37,8 @@ export function planChecks(project: Project): PlanCheck[] {
     else if (sockets && !hasRcd30(c.rcd)) out.push({ level: 'warn', text: `${c.name}: Steckdosen ohne RCD 30 mA (${c.rcd})` })
     if (watts > c.rating * 230) out.push({ level: 'warn', text: `${c.name}: Summenleistung ${Math.round(watts)} W übersteigt ${c.rating} A (${c.rating * 230} W)` })
   }
+
+  for (const i of roomIssues(project)) out.push({ level: 'warn', text: i.text, floorId: i.floorId })
 
   for (const f of project.floors) {
     // Dachschräge

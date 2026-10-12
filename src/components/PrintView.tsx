@@ -11,6 +11,7 @@ import { horizontalBands, verticalSpans } from '../lib/zones'
 import { DeviceFace, PlanSymbolShape } from './DeviceIcons'
 import { ElevationDims, FreeDim, PlanDims } from './dims'
 import { Segmented } from './ui'
+import { polyArea as roomArea, polyCentroid } from '../lib/rooms'
 import { CabinetDiagram, CabinetLayout } from './CabinetViews'
 import { DEFAULT_CABINET_OPTS, planCabinet } from '../lib/cabinet'
 import { buildTables, type Cell, type Table } from '../lib/lists'
@@ -165,6 +166,15 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
             <g key={o.id} transform={`translate(${w.a.x} ${w.a.y}) rotate(${wallAngleDeg(w)})`}>
               <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="var(--paper)" />
               <PlanOpening type={o.type} x={o.offset} w={o.width} t={t} sw={px(1)} sw2={px(0.8)} />
+            </g>
+          )
+        })}
+        {(floor.rooms ?? []).map((rm) => {
+          const c = polyCentroid(rm.poly)
+          return (
+            <g key={rm.id}>
+              <text x={c.x} y={c.y - px(4)} fontSize={px(10)} fontWeight={700} textAnchor="middle" dominantBaseline="central" fill="var(--ink)">{rm.name}</text>
+              <text x={c.x} y={c.y + px(8)} fontSize={px(8)} textAnchor="middle" dominantBaseline="central" fill="var(--ink)" opacity={0.7}>{roomArea(rm.poly).toFixed(1).replace('.', ',')} m²</text>
             </g>
           )
         })}

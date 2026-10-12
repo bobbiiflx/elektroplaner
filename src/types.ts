@@ -119,6 +119,14 @@ export interface Dormer extends OrientedRect {
   height: number // lichte Höhe unter der Gaubendecke über OKFF (mm); bei Schleppgaube: an der Front
   slope?: number // Neigung der Gaubendecke in ° (Schleppgaube); fehlt/0 = Flachdachgaube
 }
+export type RoomType = 'living' | 'dining' | 'bedroom' | 'kids' | 'office' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'utility' | 'storage' | 'cellar' | 'balcony' | 'other'
+/** Raum: Umriss (Innenseiten der Wände) für Fläche und Ausstattungsprüfung. */
+export interface Room {
+  id: string
+  name: string
+  type: RoomType
+  poly: Vec2[]
+}
 /** Dachflächenfenster: liegt in der Dachebene `roofId`; c = Mitte im Grundriss, w entlang der Traufe, h entlang der Schräge. */
 export interface Skylight {
   id: string
@@ -149,6 +157,7 @@ export interface Floor {
   dormers?: Dormer[] // Gauben (heben die Schräge lokal an)
   loggias?: Loggia[] // Loggien / Außenbereiche
   skylights?: Skylight[] // Dachflächenfenster
+  rooms?: Room[] // Räume (für Ausstattungsprüfung)
   anchor?: Vec2 // Passpunkt zum Übereinanderlegen der Geschosse
 }
 
@@ -231,6 +240,7 @@ export interface Project {
   cabinet?: { rowTE: number; reservePct: number } // Schaltschrank-Belegung
   suppliers?: Record<string, string> // Händler je Material-Position (Schlüssel wie bei prices)
   material?: { endMm: number; wastePct: number } // Leitungszuschlag je Ende (mm) und Verschnitt (%)
+  roomReq?: Partial<Record<RoomType, { sockets: number; lights: number }>> // eigene Soll-Werte je Raumart
   done?: Record<string, boolean> // Baustellen-Modus: erledigte Geräte/Leitungen (Element-ID)
   variants?: Variant[] // gemerkte Materialstände zum Vergleichen (z. B. KNX gegen konventionell)
 }

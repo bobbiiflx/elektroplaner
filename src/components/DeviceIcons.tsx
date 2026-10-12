@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Camera } from 'lucide-react'
 import { cableType, deviceType, type DeviceCategory, type DeviceType } from '../config/catalog'
 import { CABLE_IMG, DEVICE_IMG } from '../config/icons'
 
@@ -40,6 +41,13 @@ export function PlanSymbolShape({
         <g>
           <circle r={r * 1.05} fill={fill} stroke={stroke} strokeWidth={sw} />
           <path d={`M ${-r * 0.62} ${-r * 0.62} L ${r * 0.62} ${r * 0.62} M ${r * 0.62} ${-r * 0.62} L ${-r * 0.62} ${r * 0.62}`} stroke="#1d1d1f" strokeWidth={sw * 1.1} strokeLinecap="round" />
+        </g>
+      )
+    case 'doku':
+      return (
+        <g>
+          <rect x={-r * 0.95} y={-r * 0.7} width={r * 1.9} height={r * 1.4} rx={r * 0.25} fill={fill} stroke={stroke} strokeWidth={sw} />
+          <circle r={r * 0.42} fill="var(--paper)" />
         </g>
       )
     case 'box':
@@ -423,6 +431,7 @@ function DeviceFaceBase({ dt }: { dt: DeviceType }) {
 export function DeviceIcon({ typeId, size = 56 }: { typeId: string; size?: number }) {
   const img = DEVICE_IMG[typeId]
   if (img) return <img src={img} width={size} height={size} alt="" draggable={false} style={{ objectFit: 'contain' }} />
+  if (typeId === 'foto') return <Camera size={size * 0.7} color="#5ac8fa" strokeWidth={1.6} aria-hidden />
   const dt = deviceType(typeId)
   const pad = 8
   const vw = dt.w + pad * 2

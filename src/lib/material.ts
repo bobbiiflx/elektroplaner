@@ -59,7 +59,7 @@ export function materialList(project: Project, opts: MatOptions = {}): { lines: 
     for (const d of f.devices) {
       const r = resolveDevice(d, project.settings)
       const dt = deviceType(d.typeId)
-      if (d.typeId === 'steig') continue
+      if (d.typeId === 'steig' || d.typeId === 'foto') continue
       const grp: MatGroup = dt.category === 'box' ? 'Verteiler & Dosen' : 'Geräte'
       add('dev:' + dt.id, grp, r.sizeLabel && dt.sizes ? `${dt.name} · ${r.sizeLabel}` : dt.name, 'Stk', 1, dt.price)
       if (dt.box && dt.boxPrice > 0) add('box:' + dt.id, 'Verteiler & Dosen', `Gerätedose zu ${dt.name}`, 'Stk', 1, dt.boxPrice)

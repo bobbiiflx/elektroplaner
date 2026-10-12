@@ -23,7 +23,7 @@ function itemsOf(floor: Floor, unit: 'mm' | 'cm' | 'm'): Item[] {
     out.push({ id: c.id, kind: 'cable', title: `L${i + 1} · ${ct.name}`, sub: `${dn(0)} → ${dn(c.points.length - 1)} · ${formatLen(cableLengths(c.points).total, unit)}` })
   })
   for (const d of floor.devices) {
-    if (d.typeId === 'steig') continue
+    if (d.typeId === 'steig' || d.typeId === 'foto') continue
     const dt = deviceType(d.typeId)
     const wi = floor.walls.findIndex((w) => w.id === d.wallId) + 1
     out.push({ id: d.id, kind: 'device', title: dt.name, sub: `${wi ? `Wand ${wi} · ` : ''}Höhe ${formatLen(d.height, unit)}` })

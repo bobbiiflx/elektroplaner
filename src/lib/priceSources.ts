@@ -45,7 +45,7 @@ const RICHTWERT: Record<string, number> = {
 export interface Candidate { key: string; name: string }
 
 export const priceCandidates = (): Candidate[] => [
-  ...DEVICE_TYPES.filter((d) => d.id !== 'steig').flatMap((d) => [
+  ...DEVICE_TYPES.filter((d) => d.id !== 'steig' && d.id !== 'foto').flatMap((d) => [
     { key: 'dev:' + d.id, name: d.name },
     ...(d.box && d.boxPrice > 0 ? [{ key: 'box:' + d.id, name: `Gerätedose ${d.name}` }] : []),
   ]),

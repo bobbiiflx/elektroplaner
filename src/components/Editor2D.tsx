@@ -1318,7 +1318,7 @@ export default function Editor2D() {
               >
                 {open && <circle r={r * 1.55} fill="none" stroke="var(--warn)" strokeWidth={px(1.8)} strokeDasharray={`${px(4)} ${px(3)}`} />}
                 {shape(dt.category, r, fillFor(d, dt, project, colorBy), sel)}
-                {sel && label(`${dt.name} · ${formatLen(d.height, unit)}`, 0, -r - px(12))}
+                {sel && label(d.typeId === 'foto' ? dt.name : `${dt.name} · ${formatLen(d.height, unit)}`, 0, -r - px(12))}
               </g>
             )
           })}

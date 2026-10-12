@@ -102,7 +102,7 @@ export default function Inspector() {
     body = o ? <OpeningPanel opening={o} floor={floor} /> : null
   } else if (selection?.kind === 'device') {
     const d = floor.devices.find((x) => x.id === selection.id)
-    body = d ? <DevicePanel device={d} floor={floor} /> : null
+    body = d ? d.typeId === 'foto' ? <PhotoPinPanel /> : <DevicePanel device={d} floor={floor} /> : null
   } else if (selection?.kind === 'cable') {
     const c = floor.cables.find((x) => x.id === selection.id)
     body = c ? <CablePanel cable={c} floor={floor} /> : null
@@ -270,6 +270,14 @@ function OpeningPanel({ opening, floor }: { opening: Opening; floor: Floor }) {
           onCommit={(v) => upd((o) => void (o.offset = clamp(L - o.width - v, 0, Math.max(0, L - o.width))), key('o'))}
         />
       </Row>
+    </Section>
+  )
+}
+
+function PhotoPinPanel() {
+  return (
+    <Section title="Referenzfoto">
+      <p className="muted small">Frei im Grundriss platzierbar, per Ziehen verschiebbar. Fotos und Notiz unten hinzufügen, z. B. Bestand, Rohbau oder Rohrverlauf.</p>
     </Section>
   )
 }

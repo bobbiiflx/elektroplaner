@@ -1,9 +1,10 @@
 import { Fragment, useMemo, useState } from 'react'
-import { AlertTriangle, ClipboardCopy, Download } from 'lucide-react'
+import { AlertTriangle, ClipboardCopy, Download, Printer } from 'lucide-react'
 import { DIM_LABEL, deviceType } from '../config/catalog'
 import { downloadText } from '../lib/files'
 import { roleOf } from '../lib/groups'
 import { actuatorChannels, actuatorNeeds, circuitRows, toCsv, wayRows } from '../lib/schrank'
+import { buildTables, num, type Cell, type Table } from '../lib/lists'
 import { formatLen } from '../lib/units'
 import { useStore } from '../store'
 import { Modal, Segmented } from './ui'
@@ -11,14 +12,6 @@ import { NumberField } from './NumberField'
 import { VAT, materialList } from '../lib/material'
 
 type Tab = 'circuits' | 'channels' | 'ga' | 'ways' | 'material'
-type Cell = string | number
-interface Table {
-  head: string[]
-  rows: Cell[][]
-  warn?: (string | undefined)[]
-}
-
-const num = (n: number, d = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d })
 
 function DataTable({ t }: { t: Table }) {
   return (
@@ -72,49 +65,10 @@ export default function SchrankDialog() {
   }, [open, project, matFloor, withRuns])
   if (!open || !data) return null
 
-  const circuits: Table = {
-    head: ['Nr.', 'Stromkreis', 'LS', 'Phase', 'FI-Gruppe', 'Geräte', 'davon KNX', 'Leistung W', 'Strom A', 'Geschosse', 'Hinweis'],
-    rows: data.rows.map((r, i) => [i + 1, r.circuit.name, `${r.circuit.charac}${r.circuit.rating}`, r.circuit.phase === '3L' ? '3 Ph.' : r.circuit.phase, r.circuit.rcd || '–', r.devices.length, r.knx, num(r.watts), num(r.amps, 1), r.floors.join(', ') || '–', r.warn.join(' · ')]),
-    warn: data.rows.map((r) => (r.warn.length ? r.warn.join(' · ') : undefined)),
-  }
-  const channels: Table = {
-    head: ['Verteiler', 'Gruppe', 'GA', 'Art', 'Stromkreis', 'Geräte', 'Last W', 'Hinweis'],
-    rows: data.channels.map((c) => [c.dist?.name ?? '–', c.groupName, c.ga, c.kind === 'switch' ? 'Schalten' : `Dimmen ${c.dimType ? DIM_LABEL[c.dimType as keyof typeof DIM_LABEL] : ''}`, c.circuitName, c.devices, num(c.watts), c.warn.join(' · ')]),
-    warn: data.channels.map((c) => (c.warn.length ? c.warn.join(' · ') : undefined)),
-  }
-  const needs: Table = {
-    head: ['Verteiler', 'Aktor / Kanalart', 'Kanäle', 'Geräte (Stück)'],
-    rows: data.needs.map((n) => [n.dist, n.label, n.channels, n.units ?? 'nach Dimmart wählen']),
-  }
-  const groups = project.groups ?? []
-  const ga: Table = {
-    head: ['Gruppe', 'Schalten', 'Dimmen', 'Helligkeit', 'Status', 'Sender', 'Empfänger'],
-    rows: groups.map((g) => {
-      const mem = project.floors.flatMap((f) => f.devices.filter((d) => d.groupIds?.includes(g.id)))
-      const names = (role: 'sender' | 'receiver') => mem.filter((d) => roleOf(d) === role).map((d) => deviceType(d.typeId).name)
-      return [g.name, g.ga, g.gaDim ?? '', g.gaValue ?? '', g.gaStatus ?? '', names('sender').join(', ') || '–', `${names('receiver').length}`]
-    }),
-  }
-  const scenes: Table = {
-    head: ['Szene', 'Nr.', ...groups.map((g) => g.name)],
-    rows: (project.scenes ?? []).map((sc) => [sc.name, sc.no, ...groups.map((g) => (sc.values[g.id] === undefined ? '–' : `${sc.values[g.id]} %`))]),
-  }
-  const ways: Table = {
-    head: ['Verteiler', 'Gerät', 'Geschoss', 'Gruppen', 'Länge', 'Angabe'],
-    rows: data.ways.map((w) => [w.distName, deviceType(w.device.typeId).name, w.floor.name, w.groups.join(', ') || '–', m(w.len), w.manual ? 'gesetzt' : 'geschätzt']),
-    warn: data.ways.map((w) => w.warn),
-  }
+  const T = buildTables(project, unit, { floorId: matFloor || undefined, runs: withRuns })
+  const { circuits, needs, channels, ga, scenes, ways, material: matTable } = T
   const eur = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
-  const matTable: Table = {
-    head: ['Gruppe', 'Position', 'Menge', 'Einheit', 'Einzelpreis €', 'Summe €'],
-    rows: [
-      ...data.mat.lines.map((l) => [l.group, l.name, num(l.qty, l.unit === 'm' ? 1 : 0), l.unit, num(l.price, 2), num(l.sum, 2)] as Cell[]),
-      ['', 'Summe netto', '', '', '', num(data.mat.net, 2)],
-      ['', `MwSt. ${Math.round(VAT * 100)} %`, '', '', '', num(data.mat.net * VAT, 2)],
-      ['', 'Summe brutto', '', '', '', num(data.mat.net * (1 + VAT), 2)],
-    ],
-  }
-  const total = data.ways.reduce((s, w) => s + w.len, 0)
+  const total = T.waysTotal
 
   const current: { tables: { title: string; t: Table }[] } =
     tab === 'circuits'
@@ -150,6 +104,15 @@ export default function SchrankDialog() {
             }}
           >
             <ClipboardCopy size={15} /> Kopieren
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              setOpen(false)
+              useStore.getState().setPrintOpen(true, true)
+            }}
+          >
+            <Printer size={15} /> Drucken …
           </button>
           <button className="btn" onClick={() => downloadText(`${safe}-${label}.csv`, '﻿' + csv())}>
             <Download size={15} /> CSV laden

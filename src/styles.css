@@ -1185,3 +1185,6 @@ p {
 .data-table .sum-row td{font-weight:700;border-top:2px solid var(--line)}
 .price-cell .field-num{max-width:110px;margin-left:auto}
 .mat-opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.pv-table.data td{font-size:7.5pt;line-height:1.2;padding:.8mm 1.5mm;height:6.4mm}
+.pv-table.data th.r,.pv-table.data td.r{text-align:right}
+.pv-table.data tr.warn td:last-child{font-weight:700}

@@ -9,6 +9,7 @@ import { horizontalBands, verticalSpans } from '../lib/zones'
 import { DeviceFace, PlanSymbolShape } from './DeviceIcons'
 import { ElevationDims, FreeDim, PlanDims } from './dims'
 import { Segmented } from './ui'
+import { buildTables, type Cell, type Table } from '../lib/lists'
 
 type Paper = 'A4' | 'A3'
 const SHEET: Record<Paper, { w: number; h: number }> = { A4: { w: 297, h: 210 }, A3: { w: 420, h: 297 } }
@@ -23,6 +24,8 @@ interface Opts {
   plan: boolean
   walls: boolean
   list: boolean
+  lists: boolean
+  material: boolean
   zones: boolean
   dims: boolean
 }
@@ -33,6 +36,7 @@ type Page =
   | { kind: 'plan' }
   | { kind: 'wall'; wall: Wall; wi: number; side: 1 | -1; rows: Row[]; first: boolean; part: number }
   | { kind: 'cables'; rows: Row[]; part: number }
+  | { kind: 'table'; title: string; table: Table; rows: Cell[][]; warn: (string | undefined)[]; part: number }
 
 const pickScale = (fits: (n: number) => boolean) => NICE.find(fits) ?? NICE[NICE.length - 1]
 
@@ -370,6 +374,34 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
   )
 }
 
+function DataPage({ table, rows, warn }: { table: Table; rows: Cell[][]; warn: (string | undefined)[] }) {
+  const right = new Set(table.right ?? [])
+  return (
+    <table className="pv-table data">
+      <thead>
+        <tr>
+          {table.head.map((h, j) => (
+            <th key={h + j} className={right.has(j) ? 'r' : ''}>
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i} className={warn[i] ? 'warn' : ''}>
+            {r.map((c, j) => (
+              <td key={j} className={right.has(j) ? 'r' : ''}>
+                {c}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 function CablesPage({ rows }: { rows: Row[] }) {
   return (
     <table className="pv-table">
@@ -408,7 +440,8 @@ export default function PrintView() {
   const showZones = useStore((s) => s.showZones)
   const showDims = useStore((s) => s.showDims)
   const setPrintOpen = useStore((s) => s.setPrintOpen)
-  const [opts, setOpts] = useState<Opts>({ paper: 'A4', plan: true, walls: true, list: true, zones: showZones, dims: showDims })
+  const printLists = useStore((s) => s.printLists)
+  const [opts, setOpts] = useState<Opts>({ paper: 'A4', plan: !printLists, walls: !printLists, list: !printLists, lists: printLists, material: printLists, zones: showZones, dims: showDims })
 
   const { w: SW, h: SH } = SHEET[opts.paper]
   const areaW = SW - 2 * MARGIN
@@ -481,11 +514,22 @@ export default function PrintView() {
       const capN = Math.max(4, Math.floor((areaH - 14) / ROW_H))
       chunk(rows, capN, capN).forEach((rs, part) => out.push({ kind: 'cables', rows: rs, part }))
     }
+    if (opts.lists || opts.material) {
+      const T = buildTables(project, unit)
+      const defs: { title: string; t: Table }[] = []
+      if (opts.lists) defs.push({ title: 'Stromkreisliste', t: T.circuits }, { title: 'Aktorbedarf je Verteiler', t: T.needs }, { title: 'Aktorkanäle', t: T.channels }, { title: 'Gruppenadressen', t: T.ga }, { title: 'Szenen', t: T.scenes }, { title: `Leitungswege zum Verteiler (Summe ${formatLen(T.waysTotal, 'm')})`, t: T.ways })
+      if (opts.material) defs.push({ title: 'Material & Kosten (netto, Richtwerte)', t: T.material })
+      const cap = Math.max(6, Math.floor(((areaH - 14) / 6.4) * 0.85))
+      for (const { title, t } of defs) {
+        if (!t.rows.length) continue
+        chunk(t.rows.map((r, i) => ({ r, w: t.warn?.[i] })), cap, cap).forEach((rs, part) => out.push({ kind: 'table', title, table: t, rows: rs.map((x) => x.r), warn: rs.map((x) => x.w), part }))
+      }
+    }
     return out
-  }, [floor, project.settings, opts.plan, opts.walls, opts.list, areaH, unit])
+  }, [floor, project, opts.plan, opts.walls, opts.list, opts.lists, opts.material, areaH, unit])
 
   const set = (o: Partial<Opts>) => setOpts((v) => ({ ...v, ...o }))
-  const tog = (k: 'plan' | 'walls' | 'list' | 'zones' | 'dims', label: string) => (
+  const tog = (k: 'plan' | 'walls' | 'list' | 'lists' | 'material' | 'zones' | 'dims', label: string) => (
     <label className="pv-opt">
       <input type="checkbox" checked={opts[k]} onChange={(e) => set({ [k]: e.target.checked })} /> {label}
     </label>
@@ -503,6 +547,8 @@ export default function PrintView() {
         {tog('plan', 'Grundriss')}
         {tog('walls', 'Wandansichten + Checklisten')}
         {tog('list', 'Leitungsliste')}
+        {tog('lists', 'Schaltschrank-Listen')}
+        {tog('material', 'Materialliste')}
         {tog('dims', 'Maße')}
         {tog('zones', 'Zonen')}
         <div className="spacer" />
@@ -524,6 +570,13 @@ export default function PrintView() {
             return (
               <Sheet key={i} {...common} scale={p.first ? wallScale(wallLength(p.wall), p.wall.height ?? floor.wallHeight, areaW, areaH * 0.6) : undefined} title={`Wand ${p.wi + 1} · Seite ${p.side === 1 ? 1 : 2} · ${formatLen(wallLength(p.wall), unit)}${p.part ? ' (Forts.)' : ''}`}>
                 <WallPage floor={floor} wall={p.wall} wi={p.wi} side={p.side} rows={p.rows} first={p.first} opts={opts} unit={unit} areaW={areaW} areaH={areaH} zones={zones} settings={project.settings} />
+              </Sheet>
+            )
+          if (p.kind === 'table')
+            return (
+              <Sheet key={i} {...common} floorName="Gesamtprojekt" title={`${p.title}${p.part ? ' (Forts.)' : ''}`}>
+                <DataPage table={p.table} rows={p.rows} warn={p.warn} />
+                {p.title.startsWith('Material') && <p className="pv-muted" style={{ marginTop: '3mm' }}>Preise sind Richtwerte; geschätzte Zuleitungen können sich mit gezeichneten Leitungen überschneiden.</p>}
               </Sheet>
             )
           return (

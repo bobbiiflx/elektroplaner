@@ -65,6 +65,7 @@ interface State {
   colorBy: ColorBy
   printOpen: boolean
   schrankOpen: boolean
+  printLists: boolean
   inspectorTab: 'floor' | 'electric' | 'knx' | 'cabinet'
   theme: 'system' | 'light' | 'dark'
   showAllFloors: boolean
@@ -100,7 +101,7 @@ interface State {
   addCircuit: (partial?: Partial<Circuit>) => string
   addGroup: (partial?: Partial<Group>) => string
   addScene: () => string
-  setPrintOpen: (v: boolean) => void
+  setPrintOpen: (v: boolean, lists?: boolean) => void
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
   showToast: (msg: string) => void
@@ -190,6 +191,7 @@ export const useStore = create<State>((set, get) => ({
   colorBy: 'type',
   printOpen: false,
   schrankOpen: false,
+  printLists: false,
   inspectorTab: 'floor',
   theme: readTheme(),
   showAllFloors: false,
@@ -312,7 +314,7 @@ export const useStore = create<State>((set, get) => ({
     })
     return id
   },
-  setPrintOpen: (printOpen) => set({ printOpen }),
+  setPrintOpen: (printOpen, lists) => set({ printOpen, printLists: !!lists }),
   toggleAllFloors: () => set((s) => ({ showAllFloors: !s.showAllFloors })),
   toggleGhostWalls: () => set((s) => ({ ghostWalls: !s.ghostWalls })),
   openImport: (importFile) => set({ importFile }),

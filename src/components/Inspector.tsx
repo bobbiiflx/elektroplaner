@@ -22,6 +22,8 @@ import { useFloor, useStore } from '../store'
 import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } from '../types'
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
+import { OPENING_TYPES, openingDef } from '../config/catalog'
+import { OpeningIcon } from './OpeningGlyphs'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
 import { GroupFields, GroupsOverview } from './GroupsPanel'
@@ -144,23 +146,26 @@ function OpeningPanel({ opening, floor }: { opening: Opening; floor: Floor }) {
     }, key)
   const key = (k: string) => `${k}:${opening.id}`
   return (
-    <Section title={opening.type === 'door' ? 'Tür' : 'Fenster'}>
-      <Row label="Art">
-        <Segmented
-          value={opening.type}
-          onChange={(t) =>
-            upd((o) => {
-              o.type = t
-              o.sill = t === 'door' ? 0 : 900
-              o.height = t === 'door' ? 2135 : 1250
-            })
-          }
-          options={[
-            { value: 'door', label: 'Tür' },
-            { value: 'window', label: 'Fenster' },
-          ]}
-        />
-      </Row>
+    <Section title={openingDef(opening.type).name}>
+      <div className="op-types">
+          {OPENING_TYPES.map((d) => (
+            <button
+              key={d.id}
+              className={'op-type' + (opening.type === d.id ? ' on' : '')}
+              title={d.name}
+              onClick={() =>
+                upd((o) => {
+                  o.type = d.id
+                  o.sill = d.sill
+                  o.height = d.height
+                })
+              }
+            >
+              <OpeningIcon type={d.id} size={34} />
+              <span>{d.name}</span>
+            </button>
+          ))}
+      </div>
       <Row label="Breite">
         <LenField mm={opening.width} min={100} onCommit={(v) => upd((o) => void (o.width = v), key('w'))} />
       </Row>
@@ -208,7 +213,7 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
     let best: { d: number; type: string } | null = null
     for (const o of floor.openings.filter((x) => x.wallId === device.wallId)) {
       const d = device.offset < o.offset ? o.offset - device.offset : device.offset > o.offset + o.width ? device.offset - (o.offset + o.width) : 0
-      if (!best || d < best.d) best = { d, type: o.type === 'door' ? 'Tür' : 'Fenster' }
+      if (!best || d < best.d) best = { d, type: openingDef(o.type).name }
     }
     return best
   }, [floor.openings, device.wallId, device.offset])

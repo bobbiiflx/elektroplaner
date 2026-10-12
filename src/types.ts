@@ -32,7 +32,7 @@ export interface Wall {
   kind: WallKind
 }
 
-export type OpeningType = 'door' | 'window'
+export type OpeningType = 'door' | 'window' | 'floorWindow' | 'liftSlide'
 export interface Opening {
   id: string
   wallId: string

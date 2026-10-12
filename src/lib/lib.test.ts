@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../config/catalog'
+import { findGap } from './gaps'
 import { cableLengths, nearestWall, pointOnWall, wallLength } from './geom'
 import { sampleProject, elevationOf } from './factory'
 import { formatLen, fromDisplay, parseNum, toDisplay } from './units'
@@ -380,5 +381,21 @@ describe('detectWalls Farbe', () => {
     expect(hs.length).toBe(2)
     expect(vs.length).toBe(1)
     expect(vs[0].a.x).toBeLessThan(1000)
+  })
+})
+
+describe('findGap', () => {
+  const W = (id: string, ax: number, ay: number, bx: number, by: number) => ({ id, a: { x: ax, y: ay }, b: { x: bx, y: by }, thickness: 240, kind: 'outer' as const })
+  it('findet die Lücke zwischen zwei fluchtenden Wänden', () => {
+    const walls = [W('a', 0, 0, 2000, 0), W('b', 3500, 0, 6000, 0)]
+    const g = findGap(walls, { x: 2700, y: 40 })
+    expect(g).not.toBeNull()
+    expect(Math.round(g!.length)).toBe(1500)
+    expect(Math.round(g!.t)).toBe(700)
+  })
+  it('ignoriert belegte oder zu weit entfernte Lücken', () => {
+    const walls = [W('a', 0, 0, 2000, 0), W('b', 3500, 0, 6000, 0), W('c', 2000, 0, 3500, 0)]
+    expect(findGap(walls, { x: 2700, y: 0 })).toBeNull()
+    expect(findGap([walls[0], walls[1]], { x: 2700, y: 1500 })).toBeNull()
   })
 })

@@ -4,6 +4,9 @@ import { DEFAULT_CLASSES, VECTOR_CLASSES, classifyPixels, detectWallsCls, type C
 import { uid } from '../lib/geom'
 import { useStore } from '../store'
 import { Modal } from './ui'
+import { OPENING_TYPES, openingDef } from '../config/catalog'
+import { OpeningIcon } from './OpeningGlyphs'
+import type { OpeningType } from '../types'
 
 interface Params { minThickness: number; maxThickness: number; minLength: number; maxGap: number; hatch: number }
 const DEFAULT_PARAMS: Params = { minThickness: 80, maxThickness: 500, minLength: 500, maxGap: 1300, hatch: 150 }
@@ -16,6 +19,13 @@ let lastParams: Params = DEFAULT_PARAMS
 const MODE_LABEL: Record<ClassMode, string> = { wall: 'Wand (gefüllt / schraffiert)', outline: 'Wand (umrandete Fläche)', ignore: 'Ignorieren' }
 const MAX_DIM = 2600
 const key = (w: DetectedWall) => [w.a.x, w.a.y, w.b.x, w.b.y].map((v) => Math.round(v / 150)).join(',')
+type GapChoice = OpeningType | 'none'
+const GAP_ORDER: GapChoice[] = ['door', 'window', 'floorWindow', 'liftSlide', 'none']
+const GAP_COLOR: Record<GapChoice, string> = { door: '#ff9f0a', window: '#0a84ff', floorWindow: '#30b0c7', liftSlide: '#bf5af2', none: '#8e8e93' }
+const GAP_SHORT: Record<GapChoice, string> = { door: 'T', window: 'F', floorWindow: 'BF', liftSlide: 'HS', none: '–' }
+const gapKey = (w: DetectedWall, gi: number) => `${key(w)}#${gi}`
+/** Vorschlag: innen = Tür; außen = Fenster, ab 1,8 m Hebe-Schiebetür */
+const autoGap = (w: DetectedWall, width: number): GapChoice => (w.kind === 'inner' ? 'door' : width >= 1800 ? 'liftSlide' : 'window')
 const hex = (c: ColorClass) => (c.kind === 'dark' ? '#000' : `rgb(${c.rgb?.join(',')})`)
 
 function Slider({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
@@ -56,6 +66,12 @@ function Inner() {
   const [walls, setWalls] = useState<DetectedWall[]>([])
   const [off, setOff] = useState<Set<string>>(new Set())
   const [replace, setReplace] = useState(false)
+  const [gapSel, setGapSel] = useState<Record<string, GapChoice>>({})
+  const gapChoice = (w: DetectedWall, gi: number): GapChoice => gapSel[gapKey(w, gi)] ?? autoGap(w, w.gaps![gi].to - w.gaps![gi].from)
+  const cycleGap = (w: DetectedWall, gi: number) => {
+    const cur = gapChoice(w, gi)
+    setGapSel((m) => ({ ...m, [gapKey(w, gi)]: GAP_ORDER[(GAP_ORDER.indexOf(cur) + 1) % GAP_ORDER.length] }))
+  }
   const [maskUrl, setMaskUrl] = useState('')
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
@@ -208,14 +224,16 @@ function Inner() {
       for (const w of active) {
         const id = uid('w_')
         f.walls.push({ id, a: { x: Math.round(w.a.x + ox), y: Math.round(w.a.y + oy) }, b: { x: Math.round(w.b.x + ox), y: Math.round(w.b.y + oy) }, thickness: w.thickness, kind: w.kind })
-        // Lücken in der Schraffur → Türen (innen) bzw. Fenster (außen)
-        for (const g of w.gaps ?? []) {
-          const win = w.kind === 'outer'
-          f.openings.push({ id: uid('o_'), wallId: id, type: win ? 'window' : 'door', offset: Math.round(g.from), width: Math.round(g.to - g.from), height: win ? 1350 : 2010, sill: win ? 900 : 0 })
-        }
+        // Lücken in der Schraffur → Öffnung; die Wand läuft durch, Rest über/unter der Öffnung bleibt Wand
+        ;(w.gaps ?? []).forEach((g, gi) => {
+          const ch = gapChoice(w, gi)
+          if (ch === 'none') return
+          const def = openingDef(ch)
+          f.openings.push({ id: uid('o_'), wallId: id, type: ch, offset: Math.round(g.from), width: Math.round(g.to - g.from), height: def.height, sill: def.sill })
+        })
       }
     })
-    const nOp = active.reduce((n, w) => n + (w.gaps?.length ?? 0), 0)
+    const nOp = active.reduce((n, w) => n + (w.gaps ?? []).filter((_, gi) => gapChoice(w, gi) !== 'none').length, 0)
     showToast(`${active.length} Wände${nOp ? ` und ${nOp} Öffnungen` : ''} übernommen`)
     close()
   }
@@ -276,6 +294,24 @@ function Inner() {
                   </g>
                 )
               })}
+              {active.flatMap((w) =>
+                (w.gaps ?? []).map((g, gi) => {
+                  const ch = gapChoice(w, gi)
+                  const horiz = Math.abs(w.a.y - w.b.y) < 1
+                  const x = horiz ? w.a.x + g.from : w.a.x - w.thickness / 2 - sw * 2
+                  const y = horiz ? w.a.y - w.thickness / 2 - sw * 2 : w.a.y + g.from
+                  const gw = horiz ? g.to - g.from : w.thickness + sw * 4
+                  const gh = horiz ? w.thickness + sw * 4 : g.to - g.from
+                  return (
+                    <g key={gapKey(w, gi)} onClick={(e) => { e.stopPropagation(); if (!pick) cycleGap(w, gi) }} style={{ cursor: 'pointer' }}>
+                      <rect x={x} y={y} width={gw} height={gh} fill={GAP_COLOR[ch]} opacity={0.75} stroke="#fff" strokeWidth={sw} />
+                      <text x={x + gw / 2} y={y + gh / 2} fontSize={sw * 11} textAnchor="middle" dominantBaseline="central" fill="#fff" stroke="rgba(0,0,0,.35)" strokeWidth={sw * 0.8} style={{ paintOrder: 'stroke', fontWeight: 700, pointerEvents: 'none' }}>
+                        {GAP_SHORT[ch]}
+                      </text>
+                    </g>
+                  )
+                }),
+              )}
             </svg>
           )}
           <div className="wd-hint">Mausrad = Zoom · ziehen = verschieben · Wand anklicken = an/abwählen</div>
@@ -329,6 +365,20 @@ function Inner() {
           <Slider label="Mindestlänge" value={params.minLength} min={200} max={3000} step={50} unit=" mm" onChange={(v) => setP({ minLength: v })} />
           <Slider label="Lücken überbrücken (Türen)" value={params.maxGap} min={0} max={3000} step={50} unit=" mm" onChange={(v) => setP({ maxGap: v })} />
           <Slider label="Schraffurabstand schließen" value={params.hatch} min={50} max={500} step={10} unit=" mm" onChange={(v) => setP({ hatch: v })} />
+
+          <h4>Öffnungen in Lücken</h4>
+          <p className="muted small">Lücken in der Wand werden zu Türen/Fenstern; die Wand läuft durch, der Rest bleibt Wand. Marker im Plan anklicken = Art wechseln.</p>
+          <div className="wd-legend">
+            {OPENING_TYPES.map((d) => (
+              <span key={d.id} className="wd-leg">
+                <OpeningIcon type={d.id} size={22} /> <i style={{ background: GAP_COLOR[d.id] }} />
+                {GAP_SHORT[d.id]} {d.name}
+              </span>
+            ))}
+            <span className="wd-leg">
+              <i style={{ background: GAP_COLOR.none }} />– keine Öffnung
+            </span>
+          </div>
 
           <h4>
             Erkannte Wände ({active.length}/{walls.length})

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { Canvas, useThree } from '@react-three/fiber'
 import { Line, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { cableType, devType } from '../config/catalog'
+import { cableType, devType, isGlazed } from '../config/catalog'
 import { elevationOf } from '../lib/factory'
 import { boundsOf, cableLengths, pointOnWall, wallAngleDeg, wallDir, wallLength, wallNormal } from '../lib/geom'
 import { horizontalBands, verticalSpans } from '../lib/zones'
@@ -114,7 +114,7 @@ function WallMesh({
         <lineBasicMaterial color={selected ? '#0a4ea3' : dark ? '#1c1c1e' : '#8e8e93'} transparent opacity={0.55 * Math.max(opacity, 0.4)} />
       </lineSegments>
       {openings
-        .filter((o) => o.type === 'window')
+        .filter((o) => isGlazed(o.type))
         .map((o) => (
           <mesh
             key={o.id}

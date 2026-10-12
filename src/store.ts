@@ -274,7 +274,7 @@ export const useStore = create<State>((set, get) => ({
     fixSelection()
   },
 
-  setTool: (t) => set((st) => ({ tool: t, pickerOpen: t === 'device' || t === 'cable' ? (st.tool !== t ? true : st.pickerOpen) : false })),
+  setTool: (t) => set((st) => ({ tool: t, pickerOpen: t === 'device' || t === 'cable' || t === 'opening' ? (st.tool !== t ? true : st.pickerOpen) : false })),
   select: (selection) => set({ selection }),
   setOpts: (o) => set((s) => ({ opts: { ...s.opts, ...o } })),
   setUnit: (unit) => set({ unit }),

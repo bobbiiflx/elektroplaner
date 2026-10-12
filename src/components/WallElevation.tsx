@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { DOOR_DEFAULT, WINDOW_DEFAULT, electricDefaults, cableType, deviceType, deviceType as deviceTypeById, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
+import { openingDef, isGlazed, electricDefaults, cableType, deviceType, deviceType as deviceTypeById, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Wall } from '../types'
 import { clamp, pointOnWall, projectOnWall, uid, wallLength } from '../lib/geom'
@@ -32,7 +32,7 @@ const ON_WALL_TOL = 80 // mm neben der Wandfläche, bis zu dem ein Leitungsknote
 const HINTS: Record<string, string> = {
   select: 'Gerät / Öffnung anklicken und ziehen · Leertaste + Ziehen verschiebt die Ansicht · Mausrad zoomt',
   wall: 'Wände werden im Grundriss gezeichnet',
-  opening: 'Auf die Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
+  opening: 'Auf die Wand klicken, um Tür, Fenster oder Hebe-Schiebetür zu setzen',
   device: 'Auf die Wand klicken, um das Gerät zu setzen · rastet an Zonen und anderen Geräten ein',
   cable: 'Klicken setzt Leitungspunkte – nur waagerecht oder senkrecht · rastet an Dosen/Schaltern ein · Enter beendet',
   measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
@@ -310,7 +310,7 @@ export default function WallElevation() {
 
   const placeOpening = (rawU: number) => {
     if (!wall) return
-    const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+    const def = openingDef(opts.openingType)
     const width = Math.min(def.width, L)
     const id = uid('o_')
     const g = settings.grid
@@ -560,7 +560,7 @@ export default function WallElevation() {
   const ghostOpen =
     tool === 'opening' && cursor
       ? (() => {
-          const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+          const def = openingDef(opts.openingType)
           const width = Math.min(def.width, L)
           return { ...def, width, offset: clamp(Math.round((cursor.u - width / 2) / g) * g, 0, L - width) }
         })()
@@ -638,8 +638,8 @@ export default function WallElevation() {
                 style={{ cursor: tool === 'select' ? 'pointer' : undefined }}
                 onPointerDown={(e) => beginElementDrag(e, { kind: 'opening', id: o.id, grab: toWall(e.clientX, e.clientY).u - o.offset }, { kind: 'opening', id: o.id })}
               >
-                <rect x={x0} y={-top} width={o.width} height={o.height} fill={o.type === 'window' ? 'var(--accent-soft)' : 'var(--canvas)'} stroke={sel ? 'var(--accent)' : 'var(--ink)'} strokeWidth={px(sel ? 2.5 : 1.4)} />
-                {o.type === 'window' ? (
+                <rect x={x0} y={-top} width={o.width} height={o.height} fill={isGlazed(o.type) ? 'var(--accent-soft)' : 'var(--canvas)'} stroke={sel ? 'var(--accent)' : 'var(--ink)'} strokeWidth={px(sel ? 2.5 : 1.4)} />
+                {isGlazed(o.type) ? (
                   <g stroke="var(--ink)" strokeWidth={px(1)} opacity={0.6} style={{ pointerEvents: 'none' }}>
                     <line x1={x0 + o.width / 2} y1={-top} x2={x0 + o.width / 2} y2={-o.sill} />
                     <line x1={x0} y1={-o.sill - o.height / 2} x2={x0 + o.width} y2={-o.sill - o.height / 2} />

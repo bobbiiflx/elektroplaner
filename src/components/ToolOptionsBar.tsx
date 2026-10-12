@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { LenField } from './NumberField'
 import { CablePicker, CablePickerButton } from './CablePicker'
+import { OpeningPicker, OpeningPickerButton } from './OpeningPicker'
 import { DevicePicker, DevicePickerButton } from './DevicePicker'
 import { Segmented } from './ui'
 import { SpecFields, mergeSpec } from './SpecFields'
@@ -49,14 +50,10 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
       )}
 
       {tool === 'opening' && (
-        <Segmented
-          value={opts.openingType}
-          onChange={(v) => setOpts({ openingType: v })}
-          options={[
-            { value: 'door', label: 'Tür' },
-            { value: 'window', label: 'Fenster' },
-          ]}
-        />
+        <>
+          <OpeningPickerButton />
+          <span className="opt-text">Auf Wand klicken – oder in eine Lücke zwischen zwei Wänden (wird als Wand geschlossen)</span>
+        </>
       )}
 
       {tool === 'device' && (
@@ -113,6 +110,7 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         </span>
       )}
     </div>
+    {tool === 'opening' && pickerOpen && <OpeningPicker />}
     {tool === 'device' && pickerOpen && <DevicePicker />}
     {tool === 'cable' && pickerOpen && <CablePicker />}
     </>

@@ -1,4 +1,4 @@
-import type { Device, ProjectSettings, ZoneSettings, InstallMethod } from '../types'
+import type { Device, OpeningType, ProjectSettings, ZoneSettings, InstallMethod } from '../types'
 
 // ---------------------------------------------------------------------------
 // Gerätetypen (Dosen, Steckdosen, Schalter, KNX, Netzwerk, Displays)
@@ -320,6 +320,25 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
 
 export const DOOR_DEFAULT = { width: 1010, height: 2135, sill: 0 }
 export const WINDOW_DEFAULT = { width: 1010, height: 1250, sill: 900 }
+
+/** Öffnungsarten mit Standardmaßen. Der Rest der Wand (über/unter der Öffnung) bleibt immer Wand. */
+export interface OpeningDef {
+  id: OpeningType
+  name: string
+  width: number
+  height: number
+  sill: number
+  glazed: boolean
+  hint: string
+}
+export const OPENING_TYPES: OpeningDef[] = [
+  { id: 'door', name: 'Tür', width: 1010, height: 2135, sill: 0, glazed: false, hint: 'Standardtür 1,01 × 2,135 m' },
+  { id: 'window', name: 'Fenster', width: 1010, height: 1250, sill: 900, glazed: true, hint: 'Brüstung 0,90 m' },
+  { id: 'floorWindow', name: 'Bodentiefes Fenster', width: 1260, height: 2135, sill: 0, glazed: true, hint: 'bis zum Boden' },
+  { id: 'liftSlide', name: 'Hebe-Schiebetür', width: 2400, height: 2200, sill: 0, glazed: true, hint: 'Terrasse / Balkon' },
+]
+export const openingDef = (t: OpeningType): OpeningDef => OPENING_TYPES.find((o) => o.id === t) ?? OPENING_TYPES[0]
+export const isGlazed = (t: OpeningType) => openingDef(t).glazed
 
 // ---------------------------------------------------------------------------
 // Stromkreise: Farbpalette, Standardwerte

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { METHOD_LABEL, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
+import { PlanOpening } from './OpeningGlyphs'
+import { METHOD_LABEL, isGlazed, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { Cable, Device, Floor, ProjectSettings, Wall, ZoneSettings } from '../types'
 import { boundsOf, cableLengths, clamp, projectOnWall, wallAngleDeg, wallLength } from '../lib/geom'
@@ -159,17 +160,7 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
           return (
             <g key={o.id} transform={`translate(${w.a.x} ${w.a.y}) rotate(${wallAngleDeg(w)})`}>
               <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="var(--paper)" />
-              {o.type === 'door' ? (
-                <>
-                  <line x1={o.offset} y1={0} x2={o.offset} y2={o.width} stroke="var(--ink)" strokeWidth={px(1)} />
-                  <path d={`M ${o.offset} ${o.width} A ${o.width} ${o.width} 0 0 0 ${o.offset + o.width} 0`} fill="none" stroke="var(--ink-soft)" strokeWidth={px(0.8)} />
-                </>
-              ) : (
-                <>
-                  <rect x={o.offset} y={-t / 2} width={o.width} height={t} fill="none" stroke="var(--ink)" strokeWidth={px(1)} />
-                  <line x1={o.offset} y1={0} x2={o.offset + o.width} y2={0} stroke="var(--ink)" strokeWidth={px(1)} />
-                </>
-              )}
+              <PlanOpening type={o.type} x={o.offset} w={o.width} t={t} sw={px(1)} sw2={px(0.8)} />
             </g>
           )
         })}
@@ -294,7 +285,7 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
             return (
               <g key={o.id}>
                 <rect x={x0} y={-top} width={o.width} height={o.height} fill="var(--canvas)" stroke="var(--ink)" strokeWidth={px(1)} />
-                {o.type === 'window' && (
+                {isGlazed(o.type) && (
                   <g stroke="var(--ink-soft)" strokeWidth={px(0.7)}>
                     <line x1={x0 + o.width / 2} y1={-top} x2={x0 + o.width / 2} y2={-o.sill} />
                     <line x1={x0} y1={-o.sill - o.height / 2} x2={x0 + o.width} y2={-o.sill - o.height / 2} />

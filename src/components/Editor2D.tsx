@@ -1,7 +1,9 @@
 import { planPoint } from '../lib/runs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
+import { findGap, type WallGap } from '../lib/gaps'
+import { PlanOpening } from './OpeningGlyphs'
+import { openingDef, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Vec2, Wall } from '../types'
 import {
@@ -47,7 +49,7 @@ const MAX_S = 4
 const HINTS: Record<string, string> = {
   select: 'Element anklicken zum Bearbeiten · Ziehen verschiebt · Leertaste + Ziehen verschiebt die Ansicht',
   wall: 'Klicken setzt Punkte · Doppelklick, Enter oder Rechtsklick beendet · Shift schaltet „rechtwinklig“ um',
-  opening: 'Auf eine Wand klicken, um eine Tür bzw. ein Fenster zu setzen',
+  opening: 'Auf eine Wand oder in eine Lücke zwischen zwei Wänden klicken, um eine Tür / ein Fenster zu setzen',
   device: 'Auf eine Wand klicken, um das Gerät zu setzen',
   cable: 'Leitungen laufen nur waagerecht/senkrecht · Dose oder Schalter anklicken verbindet · Enter beendet · Detailarbeit in der Wandansicht (E)',
   measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
@@ -329,16 +331,38 @@ export default function Editor2D() {
     setDraft(closed ? null : { first: draft.first, last: p })
   }
 
+  /** Wand direkt unter dem Zeiger – sonst ggf. eine Lücke zwischen zwei fluchtenden Wänden. */
+  const openingTarget = (p: Vec2): { hit: ReturnType<typeof nearestWall>; gap: WallGap | null } => {
+    const hit = nearestWall(floor.walls, p, 400)
+    if (hit && hit.dist <= hit.wall.thickness / 2 + 80) return { hit, gap: null }
+    const gap = findGap(floor.walls, p)
+    return { hit: gap ? null : hit, gap }
+  }
+
   const placeOpening = (raw: Vec2) => {
-    const hit = nearestWall(floor.walls, raw, 400)
-    if (!hit) {
-      showToast('Zum Platzieren auf eine Wand klicken.')
+    const { hit, gap } = openingTarget(raw)
+    if (!hit && !gap) {
+      showToast('Zum Platzieren auf eine Wand oder in eine Lücke zwischen zwei Wänden klicken.')
       return
     }
-    const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+    const def = openingDef(opts.openingType)
+    const id = uid('o_')
+    if (gap) {
+      // Lücke als Wand schließen; die Öffnung sitzt darin, der Rest (neben/über/unter der Öffnung) bleibt Wand
+      const wid = uid('w_')
+      const width = Math.min(def.width, gap.length)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (!f) return
+        f.walls.push({ id: wid, a: { ...gap.a }, b: { ...gap.b }, thickness: gap.thickness, kind: gap.kind })
+        f.openings.push({ id, wallId: wid, type: opts.openingType, offset: Math.round(clamp(gap.t - width / 2, 0, gap.length - width)), width: Math.round(width), height: def.height, sill: def.sill })
+      })
+      select({ kind: 'opening', id })
+      return
+    }
+    if (!hit) return
     const L = wallLength(hit.wall)
     const width = Math.min(def.width, L)
-    const id = uid('o_')
     edit((p) => {
       const f = p.floors.find((x) => x.id === floor.id)
       f?.openings.push({
@@ -663,9 +687,11 @@ export default function Editor2D() {
     if (!cursor || (tool !== 'opening' && tool !== 'device')) return null
     const hit = nearestWall(floor.walls, cursor, 400)
     if (!hit) return null
+    if (tool === 'opening' && hit.dist > hit.wall.thickness / 2 + 80 && findGap(floor.walls, cursor)) return null
     return hit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, tool, floor.walls])
+  const gapGhost = useMemo(() => (cursor && tool === 'opening' ? openingTarget(cursor).gap : null), [cursor, tool, floor.walls]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const label = (text: string, x: number, y: number, rot = 0, color = 'var(--ink)') => {
     const flip = rot > 90 || rot < -90 ? rot + 180 : rot
@@ -842,17 +868,7 @@ export default function Editor2D() {
                 onPointerDown={(e) => beginElementDrag(e, { kind: 'opening', id: o.id }, { kind: 'opening', id: o.id })}
               >
                 <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="var(--paper)" />
-                {o.type === 'door' ? (
-                  <>
-                    <line x1={o.offset} y1={0} x2={o.offset} y2={o.width} stroke="var(--ink)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-                    <path d={`M ${o.offset} ${o.width} A ${o.width} ${o.width} 0 0 0 ${o.offset + o.width} 0`} fill="none" stroke="var(--ink-soft)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-                  </>
-                ) : (
-                  <>
-                    <rect x={o.offset} y={-t / 2} width={o.width} height={t} fill="none" stroke="var(--ink)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
-                    <line x1={o.offset} y1={0} x2={o.offset + o.width} y2={0} stroke="var(--ink)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
-                  </>
-                )}
+                <PlanOpening type={o.type} x={o.offset} w={o.width} t={t} sw={1.5} sw2={1} vec />
                 {sel && <rect x={o.offset} y={-t / 2 - 2} width={o.width} height={t + 4} fill="none" stroke="var(--accent)" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
               </g>
             )
@@ -987,13 +1003,25 @@ export default function Editor2D() {
 
           {/* Platzierungs-Vorschau */}
           {ghost && tool === 'opening' && (() => {
-            const def = opts.openingType === 'door' ? DOOR_DEFAULT : WINDOW_DEFAULT
+            const def = openingDef(opts.openingType)
             const L = wallLength(ghost.wall)
             const width = Math.min(def.width, L)
             const off = clamp(ghost.t - width / 2, 0, L - width)
             return (
               <g transform={`translate(${ghost.wall.a.x} ${ghost.wall.a.y}) rotate(${wallAngleDeg(ghost.wall)})`} style={{ pointerEvents: 'none' }}>
                 <rect x={off} y={-ghost.wall.thickness / 2 - 2} width={width} height={ghost.wall.thickness + 4} fill="var(--accent)" opacity={0.35} />
+              </g>
+            )
+          })()}
+          {gapGhost && tool === 'opening' && (() => {
+            const def = openingDef(opts.openingType)
+            const width = Math.min(def.width, gapGhost.length)
+            const off = clamp(gapGhost.t - width / 2, 0, gapGhost.length - width)
+            const ang = (Math.atan2(gapGhost.b.y - gapGhost.a.y, gapGhost.b.x - gapGhost.a.x) * 180) / Math.PI
+            return (
+              <g transform={`translate(${gapGhost.a.x} ${gapGhost.a.y}) rotate(${ang})`} style={{ pointerEvents: 'none' }}>
+                <rect x={0} y={-gapGhost.thickness / 2} width={gapGhost.length} height={gapGhost.thickness} fill="var(--wall)" opacity={0.28} stroke="var(--accent)" strokeDasharray="6 4" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+                <rect x={off} y={-gapGhost.thickness / 2 - 2} width={width} height={gapGhost.thickness + 4} fill="var(--accent)" opacity={0.4} />
               </g>
             )
           })()}

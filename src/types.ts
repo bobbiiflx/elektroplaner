@@ -16,6 +16,9 @@ export interface Background {
   height: number // Pixel
   mmPerPx: number // Maßstab nach Kalibrierung
   opacity: number
+  x?: number // Versatz der Bildecke im Plan (mm), Standard 0
+  y?: number
+  sheetId?: string // gleiche ID = Ausschnitte desselben Blatts (gemeinsamer Maßstab)
   source: string // z. B. "Grundriss.pdf · Seite 2"
 }
 
@@ -104,6 +107,7 @@ export interface Floor {
   devices: Device[]
   cables: Cable[]
   dims?: Dimension[]
+  anchor?: Vec2 // Passpunkt zum Übereinanderlegen der Geschosse
 }
 
 export interface HorizontalZone {

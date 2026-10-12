@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react'
 import {
   CABLE_TYPES,
@@ -14,6 +14,7 @@ import {
 import { cableLengths, clamp, wallLength } from '../lib/geom'
 import { pickFile } from '../lib/files'
 import { detectWalls } from '../lib/detectWalls'
+import { alignToReference, riserChecks } from '../lib/stack'
 import { setWallLength, syncDeviceNodes } from '../lib/link'
 import { formatLen } from '../lib/units'
 import { evaluate } from '../lib/vde'
@@ -514,6 +515,13 @@ function FloorPanel({ floor }: { floor: Floor }) {
     if (f) openImport(f)
   }
 
+  const ghostBelow = useStore((s) => s.ghostBelow)
+  const setGhostBelow = useStore((s) => s.setGhostBelow)
+  const setActiveFloor = useStore((s) => s.setActiveFloor)
+  const [refSel, setRefSel] = useState('')
+  const refId = refSel || project.floors.find((f) => f.anchor && f.id !== floor.id)?.id || project.floors[0].id
+  const stackIssues = useMemo(() => riserChecks(project), [project])
+  const noAnchor = project.floors.filter((f) => !f.anchor).length
   const bgUrl = useStore((s) => s.backgrounds[floor.id])
   const setSuggest = useStore((s) => s.setSuggest)
   const showToast = useStore((s) => s.showToast)
@@ -541,7 +549,8 @@ function FloorPanel({ floor }: { floor: Floor }) {
         showToast('Keine Wände erkannt – Plan zu unsauber oder Maßstab prüfen')
         return
       }
-      setSuggest({ floorId: floor.id, walls })
+      const ox = bg.x ?? 0, oy = bg.y ?? 0
+      setSuggest({ floorId: floor.id, walls: walls.map((w) => ({ ...w, a: { x: w.a.x + ox, y: w.a.y + oy }, b: { x: w.b.x + ox, y: w.b.y + oy } })) })
       setTool('select')
     } catch {
       showToast('Erkennung fehlgeschlagen')
@@ -583,6 +592,60 @@ function FloorPanel({ floor }: { floor: Floor }) {
           <LenField mm={floor.levelHeight} min={500} onCommit={(v) => upd((f) => void (f.levelHeight = v), `lh:${floor.id}`)} />
         </Row>
       </Section>
+
+      {project.floors.length > 1 && (
+        <Section title="Geschosse stapeln">
+          <p className="muted small">
+            Pro Geschoss denselben Bezugspunkt anklicken (Außenecke, Treppenhaus, Schacht). „Ausrichten“ verschiebt dann alle Geschosse so, dass die Punkte übereinanderliegen.
+          </p>
+          <div className="btn-row">
+            <button className="btn small" onClick={() => setTool('anchor')}>
+              {floor.anchor ? 'Passpunkt neu setzen' : 'Passpunkt setzen'}
+            </button>
+            {floor.anchor && (
+              <button className="btn small" onClick={() => upd((f) => void (f.anchor = undefined), `anc:${floor.id}`)}>
+                Entfernen
+              </button>
+            )}
+          </div>
+          <Row label="Bezugsgeschoss">
+            <select value={refId} onChange={(e) => setRefSel(e.target.value)}>
+              {project.floors.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                  {f.anchor ? '' : ' (kein Passpunkt)'}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <button
+            className="btn block"
+            disabled={!project.floors.find((f) => f.id === refId)?.anchor}
+            onClick={() => {
+              let n = 0
+              edit((p) => void (n = alignToReference(p as typeof project, refId)))
+              showToast(n ? `${n} Geschosse ausgerichtet` : 'Nichts zu verschieben (Passpunkte fehlen oder liegen schon deckungsgleich)')
+            }}
+          >
+            Alle Geschosse ausrichten
+          </button>
+          <label className="check">
+            <input type="checkbox" checked={ghostBelow} onChange={(e) => setGhostBelow(e.target.checked)} /> Geschoss darunter als Schatten zeigen
+          </label>
+          {noAnchor > 0 && <p className="muted small">{noAnchor} Geschoss(e) ohne Passpunkt – Durchführungs-Prüfung ist nur bei ausgerichteten Geschossen aussagekräftig.</p>}
+          {stackIssues.length > 0 ? (
+            stackIssues.map((i, k) => (
+              <p key={k} className="status-line warn" style={{ cursor: 'pointer' }} onClick={() => setActiveFloor(i.floorId)}>
+                <AlertTriangle size={16} /> {i.text}
+              </p>
+            ))
+          ) : (
+            <p className="muted small">
+              <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> Keine Auffälligkeiten bei den Steigpunkten.
+            </p>
+          )}
+        </Section>
+      )}
 
       <Section title="Grundriss">
         {bg ? (

@@ -20,7 +20,7 @@ import { uid } from './lib/geom'
 import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 
-export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'measure' | 'calibrate'
+export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
 export type ViewMode = 'split' | '2d' | '3d'
 
 export interface AskDialog {
@@ -55,6 +55,9 @@ interface State {
   metas: ProjectMeta[]
   project: Project
   backgrounds: Record<string, string>
+  ghostBelow: boolean
+  setGhostBelow: (v: boolean) => void
+  addSheetFloors: (items: { name: string; dataUrl: string; bg: Background }[]) => string[]
   suggest: { floorId: string; walls: (DetectedWall & { id: string })[] } | null
   setSuggest: (v: { floorId: string; walls: DetectedWall[] } | null) => void
   dropSuggestion: (id: string) => void
@@ -177,6 +180,8 @@ export const useStore = create<State>((set, get) => ({
   project: initial,
   backgrounds: {},
   suggest: null,
+  ghostBelow: false,
+  setGhostBelow: (v) => set({ ghostBelow: v }),
   activeFloorId: initial.floors[0].id,
   selection: null,
   tool: 'select',
@@ -459,6 +464,38 @@ export const useStore = create<State>((set, get) => ({
     })
     set({ suggest: null })
     get().showToast(`${sg.walls.length} Wände übernommen`)
+  },
+
+  addSheetFloors: (items) => {
+    const st = get()
+    const pid = st.project.id
+    const active = st.project.floors.find((f) => f.id === st.activeFloorId)
+    const reuse = !!active && !active.walls.length && !active.devices.length && !active.cables.length && !active.background
+    const ids: string[] = []
+    const fresh = items.map((it, i) => {
+      if (i === 0 && reuse && active) { ids.push(active.id); return null }
+      const f = newFloor(st.project.settings, it.name)
+      f.background = it.bg
+      ids.push(f.id)
+      return f
+    })
+    get().edit((p) => {
+      items.forEach((it, i) => {
+        const f = fresh[i]
+        if (f) p.floors.push(f)
+        else {
+          const ex = p.floors.find((x) => x.id === ids[i])
+          if (ex) { ex.name = it.name; ex.background = it.bg }
+        }
+      })
+    })
+    const bgs = { ...get().backgrounds }
+    items.forEach((it, i) => {
+      bgs[ids[i]] = it.dataUrl
+      void storage.saveBackground(pid, ids[i], it.dataUrl)
+    })
+    set({ backgrounds: bgs, activeFloorId: ids[0], selection: null })
+    return ids
   },
 
   setBackground: (floorId, dataUrl, bg) => {

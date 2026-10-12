@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { loadImage, mmPerPxFromScale, openPdf, renderPage, type PdfDoc } from '../lib/pdf'
 import { useStore } from '../store'
 import { NumberField } from './NumberField'
+import SheetSplit from './SheetSplit'
 import { Modal, Row } from './ui'
 
 export default function ImportDialog() {
@@ -24,13 +25,16 @@ function ImportInner({ file }: { file: File }) {
   const [numPages, setNumPages] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
   const [denom, setDenom] = useState(100)
+  const [sheet, setSheet] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const docRef = useRef<PdfDoc | null>(null)
 
   // Bilder: sofort importieren
+  const single = () => setSingleImg(true)
+  const [singleImg, setSingleImg] = useState(false)
   useEffect(() => {
-    if (isPdf) return
+    if (isPdf || !singleImg) return
     let cancelled = false
     ;(async () => {
       setBusy(true)
@@ -124,6 +128,34 @@ function ImportInner({ file }: { file: File }) {
     }
   }
 
+  if (sheet)
+    return (
+      <SheetSplit
+        onClose={close}
+        source={
+          isPdf
+            ? { fileName: file.name, doc: docRef.current!, page: selected[0] ?? 1 }
+            : { fileName: file.name, image: (m) => loadImage(file, m) }
+        }
+      />
+    )
+
+  if (!isPdf && !singleImg) {
+    return (
+      <Modal title="Bild importieren" width={420} onClose={close}>
+        <p className="muted">Zeigt das Bild ein Geschoss oder mehrere Geschosse nebeneinander?</p>
+        <div className="btn-row">
+          <button className="btn primary" onClick={single}>
+            Ein Geschoss
+          </button>
+          <button className="btn" onClick={() => setSheet(true)}>
+            Mehrere Geschosse auf dem Blatt …
+          </button>
+        </div>
+      </Modal>
+    )
+  }
+
   if (!isPdf) {
     return (
       <Modal title="Grundriss wird geladen" width={360} onClose={close}>
@@ -147,6 +179,9 @@ function ImportInner({ file }: { file: File }) {
         <>
           <button className="btn" onClick={close}>
             Abbrechen
+          </button>
+          <button className="btn" disabled={selected.length !== 1 || busy} onClick={() => setSheet(true)} title="Eine Seite wählen, auf der mehrere Geschosse nebeneinander stehen">
+            Mehrere Geschosse auf dieser Seite …
           </button>
           <button className="btn primary" disabled={!selected.length || busy} onClick={doImport}>
             {busy ? 'Importiere …' : selected.length > 1 ? `${selected.length} Seiten als Geschosse importieren` : 'Seite importieren'}

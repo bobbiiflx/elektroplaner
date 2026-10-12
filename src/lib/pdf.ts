@@ -83,3 +83,19 @@ export function readFileAsDataUrl(file: File): Promise<string> {
     r.readAsDataURL(file)
   })
 }
+
+/** Textstücke der Seite in Pixelkoordinaten des mit pxPerPt gerenderten Bildes (nur bei PDFs mit Textebene). */
+export async function pageTexts(doc: PdfDoc, pageNo: number, pxPerPt: number): Promise<{ str: string; x: number; y: number; w: number; h: number }[]> {
+  const page = await doc.getPage(pageNo)
+  const viewport = page.getViewport({ scale: pxPerPt })
+  const content = await page.getTextContent()
+  const out: { str: string; x: number; y: number; w: number; h: number }[] = []
+  for (const it of content.items) {
+    if (!('str' in it) || !it.str.trim()) continue
+    const t = pdfjs.Util.transform(viewport.transform, it.transform)
+    const h = Math.hypot(t[2], t[3])
+    out.push({ str: it.str, x: t[4], y: t[5] - h, w: it.width * pxPerPt, h })
+  }
+  page.cleanup()
+  return out
+}

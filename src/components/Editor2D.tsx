@@ -1,3 +1,4 @@
+import { planPoint } from '../lib/runs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
@@ -51,12 +52,14 @@ const HINTS: Record<string, string> = {
   cable: 'Leitungen laufen nur waagerecht/senkrecht · Dose oder Schalter anklicken verbindet · Enter beendet · Detailarbeit in der Wandansicht (E)',
   measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
+  anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
 }
 
 export default function Editor2D() {
   const floor = useFloor()
   const project = useStore((s) => s.project)
   const backgrounds = useStore((s) => s.backgrounds)
+  const ghostBelow = useStore((s) => s.ghostBelow)
   const suggest = useStore((s) => s.suggest)
   const dropSuggestion = useStore((s) => s.dropSuggestion)
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
@@ -477,6 +480,9 @@ export default function Editor2D() {
     edit((p) => {
       const f = p.floors.find((x) => x.id === floor.id)
       if (f?.background) f.background.mmPerPx *= factor
+      // Ausschnitte desselben Blatts teilen sich den Maßstab
+      const sid = f?.background?.sheetId
+      if (sid) for (const o of p.floors) if (o !== f && o.background?.sheetId === sid) o.background.mmPerPx *= factor
     })
     setCalib({})
     setTool('select')
@@ -523,6 +529,17 @@ export default function Editor2D() {
       case 'calibrate':
         addCalibPoint(raw)
         break
+      case 'anchor': {
+        const sn = snap(raw, undefined, false)
+        const pt = sn.kind === 'node' ? sn.p : raw
+        edit((p) => {
+          const f = p.floors.find((x) => x.id === floor.id)
+          if (f) f.anchor = { x: Math.round(pt.x), y: Math.round(pt.y) }
+        })
+        setTool('select')
+        showToast('Passpunkt gesetzt.')
+        break
+      }
     }
   }
 
@@ -727,8 +744,8 @@ export default function Editor2D() {
           {bg && bgUrl && (
             <image
               href={bgUrl}
-              x={0}
-              y={0}
+              x={bg.x ?? 0}
+              y={bg.y ?? 0}
               width={bg.width * bg.mmPerPx}
               height={bg.height * bg.mmPerPx}
               opacity={bg.opacity}
@@ -738,6 +755,35 @@ export default function Editor2D() {
           )}
           {g * s >= 7 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMinor)" style={{ pointerEvents: 'none' }} />}
           {1000 * s >= 12 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMajor)" style={{ pointerEvents: 'none' }} />}
+
+          {/* Geschoss darunter als Schatten (Stapelkontrolle) */}
+          {ghostBelow &&
+            (() => {
+              const idx = project.floors.findIndex((f) => f.id === floor.id)
+              const below = idx > 0 ? project.floors[idx - 1] : null
+              if (!below) return null
+              return (
+                <g style={{ pointerEvents: 'none' }} opacity={0.5}>
+                  {below.walls.map((w) => (
+                    <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="#af52de" strokeWidth={Math.max(30, w.thickness * 0.4)} strokeDasharray={`${px(8)} ${px(5)}`} />
+                  ))}
+                  {below.devices
+                    .filter((d) => d.typeId === 'steig')
+                    .map((d) => {
+                      const q = planPoint(below, d)
+                      return q ? <circle key={d.id} cx={q.x} cy={q.y} r={140} fill="none" stroke="#af52de" strokeWidth={px(2)} /> : null
+                    })}
+                </g>
+              )
+            })()}
+
+          {floor.anchor && (
+            <g style={{ pointerEvents: 'none' }} stroke="#ff2d55" strokeWidth={px(2)}>
+              <circle cx={floor.anchor.x} cy={floor.anchor.y} r={px(8)} fill="none" />
+              <line x1={floor.anchor.x - px(14)} y1={floor.anchor.y} x2={floor.anchor.x + px(14)} y2={floor.anchor.y} />
+              <line x1={floor.anchor.x} y1={floor.anchor.y - px(14)} x2={floor.anchor.x} y2={floor.anchor.y + px(14)} />
+            </g>
+          )}
 
           {/* Wände */}
           {floor.walls.map((w) => {

@@ -324,3 +324,40 @@ describe('Preislisten-Import', () => {
     expect(matchRow(rows[2].name, c)?.key).toBe('cab:nym-5x1.5')
   })
 })
+
+import { levelOf, labelsFromText, splitByWhitespace, nameBlocks } from './sheet'
+import { translateFloor, riserChecks } from './stack'
+describe('Blatt mit mehreren Geschossen', () => {
+  it('erkennt Geschossnamen', () => {
+    expect(levelOf('Grundriss Erdgeschoss M 1:100')?.level).toBe(0)
+    expect(levelOf('1.OG')?.level).toBe(1)
+    expect(levelOf('2. Obergeschoss')?.level).toBe(2)
+    expect(levelOf('Kellergeschoss')?.level).toBe(-1)
+    expect(levelOf('Dachgeschoss')?.level).toBe(90)
+    expect(levelOf('Schnitt A-A')).toBeNull()
+  })
+  it('teilt Blatt in Blöcke und benennt sie', () => {
+    const W = 600, H = 300
+    const g = new Uint8Array(W * H).fill(255)
+    const box = (x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (x < x0 + 4 || x >= x1 - 4 || y < y0 + 4 || y >= y1 - 4) g[y * W + x] = 0 }
+    box(20, 60, 180, 260); box(220, 60, 380, 260); box(420, 60, 580, 260)
+    const blocks = splitByWhitespace(g, W, H)
+    expect(blocks.length).toBe(3)
+    const labels = labelsFromText([
+      { str: 'Obergeschoss', x: 230, y: 30, w: 100, h: 14 },
+      { str: 'Erdgeschoss', x: 430, y: 30, w: 100, h: 14 },
+      { str: 'Keller', x: 30, y: 30, w: 50, h: 14 },
+    ])
+    const named = nameBlocks(blocks, labels)
+    expect(named.map((b) => b.name)).toEqual(['Keller', 'Erdgeschoss', '1. Obergeschoss'])
+    expect(named[0].x0).toBeLessThan(30)
+  })
+  it('verschiebt Geschosse und prüft Durchführungen', () => {
+    const mk = (id: string, x: number): any => ({ id, name: id, levelHeight: 2800, wallHeight: 2500, walls: [], openings: [], cables: [], devices: [{ id: 'r' + id, typeId: 'steig', wallId: '', offset: 0, side: 1, height: 0, x, y: 1000 }] })
+    const p: any = { floors: [mk('EG', 1000), mk('OG', 1800)] }
+    expect(riserChecks(p).length).toBe(1)
+    translateFloor(p.floors[1], -800, 0)
+    expect(p.floors[1].devices[0].x).toBe(1000)
+    expect(riserChecks(p).length).toBe(0)
+  })
+})

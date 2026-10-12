@@ -3,6 +3,13 @@ import type { Project, ProjectMeta } from '../types'
 
 const INDEX_KEY = 'ep:index'
 const projKey = (id: string) => `ep:proj:${id}`
+const snapKey = (id: string) => `ep:snap:${id}`
+const MAX_SNAPSHOTS = 20
+export interface Snapshot {
+  at: string
+  label: string
+  project: Project
+}
 const bgKey = (pid: string, fid: string) => `ep:bg:${pid}:${fid}`
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -53,6 +60,7 @@ export async function deleteBackground(pid: string, fid: string): Promise<void> 
 export async function deleteProject(p: Project): Promise<void> {
   await safe(async () => {
     await del(projKey(p.id))
+    await del(snapKey(p.id))
     for (const f of p.floors) await del(bgKey(p.id, f.id))
     const metas = ((await get<ProjectMeta[]>(INDEX_KEY)) ?? []).filter((m) => m.id !== p.id)
     await writeIndex(metas)
@@ -81,4 +89,23 @@ export function parseImport(text: string): { project: Project; backgrounds: Reco
     throw new Error('Keine gültige Elektroplaner-Datei')
   }
   return { project: data.project, backgrounds: data.backgrounds ?? {} }
+}
+
+// --- Versionen (automatische Sicherungen) ----------------------------------
+
+export async function listSnapshots(pid: string): Promise<Snapshot[]> {
+  return safe(async () => (await get<Snapshot[]>(snapKey(pid))) ?? [], [])
+}
+
+/** Legt eine Sicherung an, höchstens eine je `minGapMs` (außer force). */
+export async function addSnapshot(p: Project, label: string, minGapMs: number, force = false): Promise<void> {
+  await safe(async () => {
+    const list = (await get<Snapshot[]>(snapKey(p.id))) ?? []
+    const last = list[list.length - 1]
+    const now = Date.now()
+    if (!force && last && now - new Date(last.at).getTime() < minGapMs) return
+    if (last && JSON.stringify(last.project) === JSON.stringify(p)) return
+    list.push({ at: new Date(now).toISOString(), label, project: p })
+    await set(snapKey(p.id), list.slice(-MAX_SNAPSHOTS))
+  }, undefined)
 }

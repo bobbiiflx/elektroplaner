@@ -1,13 +1,70 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Check, ChevronDown, History, Download, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
-import { exportJson } from '../lib/storage'
+import { exportJson, addSnapshot, listSnapshots, type Snapshot } from '../lib/storage'
 import { UNITS } from '../lib/units'
 import { useStore } from '../store'
-import { Segmented } from './ui'
+import { Modal, Segmented } from './ui'
 import { ColorByControl } from './ElectricPanel'
 
+function VersionsDialog({ onClose }: { onClose: () => void }) {
+  const project = useStore((s) => s.project)
+  const restore = useStore((s) => s.restoreSnapshot)
+  const showToast = useStore((s) => s.showToast)
+  const [list, setList] = useState<Snapshot[] | null>(null)
+  useEffect(() => {
+    void listSnapshots(project.id).then(setList)
+  }, [project.id])
+  const count = (p: Snapshot['project']) => p.floors.reduce((n, f) => n + f.walls.length + f.devices.length + f.cables.length, 0)
+  return (
+    <Modal
+      title="Versionen"
+      onClose={onClose}
+      width={460}
+      footer={
+        <button
+          className="btn"
+          onClick={async () => {
+            await addSnapshot(project, 'Manuell', 0, true)
+            setList(await listSnapshots(project.id))
+            showToast('Version gesichert.')
+          }}
+        >
+          Jetzt sichern
+        </button>
+      }
+    >
+      <p className="muted small">Der Planer sichert automatisch alle 10 Minuten (die letzten 20 Stände). Die Daten liegen nur in diesem Browser.</p>
+      {list && !list.length && <p className="muted">Noch keine Version vorhanden.</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflow: 'auto' }}>
+        {[...(list ?? [])].reverse().map((v) => (
+          <div key={v.at} className="menu-item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div>{new Date(v.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              <div className="muted small">
+                {v.label} · {count(v.project)} Elemente
+              </div>
+            </div>
+            <button
+              className="btn small"
+              onClick={async () => {
+                await restore(v.at)
+                showToast('Version wiederhergestellt.')
+                onClose()
+              }}
+            >
+              Wiederherstellen
+            </button>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
 function ProjectMenu() {
+  const [versions, setVersions] = useState(false)
   const project = useStore((s) => s.project)
   const metas = useStore((s) => s.metas)
   const backgrounds = useStore((s) => s.backgrounds)
@@ -35,6 +92,7 @@ function ProjectMenu() {
 
   return (
     <div className="menu-wrap" ref={ref}>
+      {versions && createPortal(<VersionsDialog onClose={() => setVersions(false)} />, document.body)}
       <button className="project-btn" onClick={() => setOpen((o) => !o)}>
         <span className="project-name">{project.name}</span>
         <ChevronDown size={16} />
@@ -136,6 +194,15 @@ function ProjectMenu() {
             }}
           >
             <FolderOpen size={15} /> Importieren …
+          </button>
+          <button
+            className="menu-action"
+            onClick={() => {
+              setOpen(false)
+              setVersions(true)
+            }}
+          >
+            <History size={15} /> Versionen …
           </button>
         </div>
       )}

@@ -101,6 +101,7 @@ interface State {
   undo: () => void
   redo: () => void
   setTool: (t: Tool) => void
+  restoreSnapshot: (at: string) => Promise<void>
   select: (s: Selection | null) => void
   setOpts: (o: Partial<ToolOptions>) => void
   setUnit: (u: Unit) => void
@@ -406,6 +407,17 @@ export const useStore = create<State>((set, get) => ({
     await get().openProject(p.id)
   },
 
+  restoreSnapshot: async (at) => {
+    const cur = get().project
+    const snap = (await storage.listSnapshots(cur.id)).find((x) => x.at === at)
+    if (!snap) return
+    // aktuellen Stand sichern, damit die Wiederherstellung selbst rückgängig zu machen ist
+    await storage.addSnapshot(cur, 'Vor Wiederherstellung', 0, true)
+    await storage.saveProject({ ...snap.project, updatedAt: new Date().toISOString() })
+    await get().openProject(cur.id)
+    set({ metas: await storage.listProjects() })
+  },
+
   removeProject: async (id) => {
     const metas = await storage.listProjects()
     const victim = id === get().project.id ? get().project : await storage.loadProject(id)
@@ -635,7 +647,10 @@ useStore.subscribe((s, prev) => {
   if (s.project === prev.project || s.project.id !== prev.project.id) return
   window.clearTimeout(saveTimer)
   saveTimer = window.setTimeout(async () => {
-    await storage.saveProject(useStore.getState().project)
+    const proj = useStore.getState().project
+    await storage.saveProject(proj)
     useStore.setState({ metas: await storage.listProjects() })
+    // Version höchstens alle 10 Minuten
+    void storage.addSnapshot(proj, 'Automatisch', 10 * 60 * 1000)
   }, 500)
 })

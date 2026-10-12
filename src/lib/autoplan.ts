@@ -66,7 +66,7 @@ export function suggestCircuits(project: Project): ProposedCircuit[] {
     const byRoom = new Map<string, Item[]>()
     const common: Item[] = []
     for (const it of sockets) {
-      if (it.room && OWN_ROOMS.has(it.room.type)) {
+      if (it.room && (it.room.ownCircuit ?? OWN_ROOMS.has(it.room.type))) {
         const arr = byRoom.get(it.room.id) ?? []
         arr.push(it)
         byRoom.set(it.room.id, arr)

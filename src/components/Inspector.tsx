@@ -535,6 +535,13 @@ function RoomPanel({ room, floor }: { room: Room; floor: Floor }) {
           ))}
         </select>
       </Row>
+      <Row label="Eigener Stromkreis" hint="für die Steckdosen">
+        <input
+          type="checkbox"
+          checked={room.ownCircuit ?? ['kitchen', 'bath', 'utility'].includes(room.type)}
+          onChange={(e) => upd((r) => void (r.ownCircuit = e.target.checked))}
+        />
+      </Row>
       <Row label="Fläche">
         <b>{polyArea(room.poly).toFixed(2).replace('.', ',')} m²</b>
       </Row>

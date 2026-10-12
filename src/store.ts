@@ -48,6 +48,7 @@ export interface ToolOptions {
   cableTypeId: string
   cableZ: number
   ortho: boolean
+  roomMode: 'auto' | 'rect' | 'poly' // Raum festlegen: automatisch aus Wänden, Rechteck oder freies Polygon
   snap: boolean // Lineal: am Raster / an Objektmitten einrasten
   spec: DeviceSpec // gewählte Serie / Größe / Dose für neu gesetzte Geräte
   circuitId?: string // aktiver Stromkreis: neue Geräte werden ihm zugewiesen
@@ -231,6 +232,7 @@ export const useStore = create<State>((set, get) => ({
     cableTypeId: 'nym-3x1.5',
     cableZ: 300,
     ortho: true,
+    roomMode: 'auto',
     snap: true,
     spec: {},
   },

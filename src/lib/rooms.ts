@@ -157,10 +157,14 @@ const SOCKET_TOL = 400 // mm: Geräte an der Wandfläche gehören zum nächstgel
 export function roomOfDevice(floor: Floor, p: Vec2): Room | null {
   let best: Room | null = null
   let bd = SOCKET_TOL
+  let bestArea = Infinity
   for (const r of floor.rooms ?? []) {
     const d = distToPoly(r.poly, p)
-    if (d < bd || (d === 0 && bd > 0)) {
+    const area = polyArea(r.poly)
+    // innerhalb mehrerer Räume (z. B. offene Küche im Wohnraum): der kleinste, also speziellste Raum gewinnt
+    if (d < bd || (d === 0 && (bd > 0 || area < bestArea))) {
       bd = d
+      bestArea = area
       best = r
     }
   }

@@ -44,6 +44,7 @@ type Drag =
   | { kind: 'sky'; id: string; start: Vec2; c0: Vec2 }
   | { kind: 'shape'; what: ShapeKind; id: string; start: Vec2; a0: Vec2; b0: Vec2 }
   | { kind: 'shapePt'; what: ShapeKind; id: string; pt: 'a' | 'b' | 'depth' }
+  | { kind: 'roomPt'; id: string; idx: number }
 
 type ShapeKind = 'roof' | 'dormer' | 'loggia'
 
@@ -66,7 +67,7 @@ const HINTS: Record<string, string> = {
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
   roof: 'Dachschräge: 1. und 2. Klick = Linie, an der die Schräge beginnt (Kniestock/Traufe) · 3. Klick = Seite, zu der sie ansteigt (in den Raum)',
   dormer: 'Gaube: 1. und 2. Klick = Gaubenfront (Außenkante) · 3. Klick = Tiefe in den Raum (zieht die Rechteckfläche auf)',
-  room: 'Raum festlegen: in einen geschlossenen Raum klicken – Fläche und Ausstattung werden erkannt (Wände müssen den Raum umschließen)',
+  room: 'Raum festlegen: Automatisch = in einen geschlossenen Raum klicken · Rechteck = zwei Ecken · Frei = Eckpunkte anklicken, Startpunkt oder Enter schließt (z. B. offene Küche) · Eckpunkte später ziehbar',
   skylight: 'Dachflächenfenster: in die Dachschräge klicken (Mitte des Fensters) · danach Größe rechts einstellen',
   loggia: 'Loggia: 1. und 2. Klick = offene Seite (Brüstung) · 3. Klick = Tiefe in den Raum',
   anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
@@ -114,6 +115,7 @@ export default function Editor2D() {
   const [calibReal, setCalibReal] = useState(0)
   const [measureA, setMeasureA] = useState<Vec2 | null>(null)
   const [roofA, setRoofA] = useState<Vec2 | null>(null)
+  const [roomPts, setRoomPts] = useState<Vec2[]>([])
   const [roofB, setRoofB] = useState<Vec2 | null>(null)
   const [shiftDown, setShiftDown] = useState(false)
 
@@ -272,12 +274,32 @@ export default function Editor2D() {
     setMeasureA(null)
     setRoofA(null)
     setRoofB(null)
+    setRoomPts([])
   }, [])
 
   const finishCable = useCallback(() => {
     if (cableDraft.length >= 2) createCable(cableDraft)
     setCableDraft([])
   }, [cableDraft, createCable])
+
+  const addRoom = useCallback(
+    (poly: Vec2[]) => {
+      const id = uid('rm_')
+      const n = (floor.rooms?.length ?? 0) + 1
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (f) (f.rooms ??= []).push({ id, name: `Raum ${n}`, type: 'other', poly })
+      })
+      select({ kind: 'room', id })
+      showToast('Raum angelegt – Name und Raumart stehen rechts.')
+    },
+    [floor.id, floor.rooms?.length, edit, select, showToast],
+  )
+
+  const finishRoom = useCallback(() => {
+    if (roomPts.length >= 3) addRoom(roomPts.map((q) => ({ x: Math.round(q.x), y: Math.round(q.y) })))
+    setRoomPts([])
+  }, [roomPts, addRoom])
 
   useEffect(() => {
     const isTyping = (t: EventTarget | null) => {
@@ -293,10 +315,11 @@ export default function Editor2D() {
       } else if (e.key === 'Escape') {
         const st = useStore.getState()
         if (st.pickerOpen) st.setPickerOpen(false)
-        else if (draft || cableDraft.length || calib.a || measureA || roofA) cancelDrafts()
+        else if (draft || cableDraft.length || calib.a || measureA || roofA || roomPts.length) cancelDrafts()
         else setTool('select')
       } else if (e.key === 'Enter') {
         if (tool === 'cable') finishCable()
+        else if (tool === 'room' && roomPts.length >= 3) finishRoom()
         else setDraft(null)
       } else if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
         fit()
@@ -311,7 +334,7 @@ export default function Editor2D() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [draft, cableDraft, calib.a, measureA, roofA, tool, cancelDrafts, finishCable, fit, setTool])
+  }, [draft, cableDraft, calib.a, measureA, roofA, roomPts, tool, cancelDrafts, finishCable, finishRoom, fit, setTool])
 
   useEffect(() => {
     cancelDrafts()
@@ -686,19 +709,37 @@ export default function Editor2D() {
         addRoofPoint(raw, orthoNow)
         break
       case 'room': {
+        if (opts.roomMode === 'rect') {
+          const q = snap(raw, undefined, false).p
+          const a = roomPts[0]
+          if (!a) {
+            setRoomPts([q])
+          } else {
+            if (Math.abs(q.x - a.x) < 300 || Math.abs(q.y - a.y) < 300) {
+              showToast('Rechteck zu klein.')
+              break
+            }
+            addRoom([{ x: a.x, y: a.y }, { x: q.x, y: a.y }, { x: q.x, y: q.y }, { x: a.x, y: q.y }])
+            setRoomPts([])
+          }
+          break
+        }
+        if (opts.roomMode === 'poly') {
+          const first = roomPts[0]
+          if (first && roomPts.length >= 3 && dist(first, raw) < 18 / s) {
+            finishRoom()
+            break
+          }
+          const q = snap(raw, roomPts[roomPts.length - 1], orthoNow).p
+          setRoomPts([...roomPts, q])
+          break
+        }
         const poly = detectRoom(floor, raw)
         if (!poly) {
           showToast('Kein geschlossener Raum an dieser Stelle – Wände müssen den Raum vollständig umschließen (Türen/Lücken mit Wand schließen).')
           break
         }
-        const id = uid('rm_')
-        const n = (floor.rooms?.length ?? 0) + 1
-        edit((p) => {
-          const f = p.floors.find((x) => x.id === floor.id)
-          if (f) (f.rooms ??= []).push({ id, name: `Raum ${n}`, type: 'other', poly })
-        })
-        select({ kind: 'room', id })
-        showToast('Raum angelegt – Name und Raumart stehen rechts.')
+        addRoom(poly)
         break
       }
       case 'skylight': {
@@ -842,6 +883,16 @@ export default function Editor2D() {
           if (w) { w.a = { ...lg.a }; w.b = { ...lg.b } }
         }
       }, `shape:${d.id}`)
+    } else if (d.kind === 'roomPt') {
+      const { p: q } = snap(raw, undefined, false, true)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        const pt = f?.rooms?.find((x) => x.id === d.id)?.poly[d.idx]
+        if (pt) {
+          pt.x = Math.round(q.x)
+          pt.y = Math.round(q.y)
+        }
+      }, `rp:${d.id}:${d.idx}`)
     } else if (d.kind === 'cableNode') {
       const { p: q } = snap(raw, undefined, false, true)
       edit((p) => {
@@ -1184,9 +1235,27 @@ export default function Editor2D() {
                   {label(rm.name, c.x, c.y - px(6), 0, sel ? 'var(--accent)' : 'var(--ink)')}
                   {label(`${polyArea(rm.poly).toFixed(1).replace('.', ',')} m²${bad ? ' · ⚠' : ''}`, c.x, c.y + px(8), 0, bad ? '#d70015' : 'var(--ink-soft)')}
                 </g>
+                {sel && tool === 'select' &&
+                  rm.poly.map((q, i) => (
+                    <circle key={i} cx={q.x} cy={q.y} r={px(6)} fill="var(--paper)" stroke="var(--accent)" strokeWidth={px(2)} style={{ cursor: 'grab' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'roomPt', id: rm.id, idx: i })} />
+                  ))}
               </g>
             )
           })}
+
+          {/* Raum im Entstehen (Rechteck / freies Polygon) */}
+          {tool === 'room' && roomPts.length > 0 && (() => {
+            const cur = cursor ? (opts.roomMode === 'rect' ? snap(cursor, undefined, false).p : snap(cursor, roomPts[roomPts.length - 1], opts.ortho !== shiftDown).p) : null
+            const pts = opts.roomMode === 'rect' && cur ? [roomPts[0], { x: cur.x, y: roomPts[0].y }, cur, { x: roomPts[0].x, y: cur.y }] : cur ? [...roomPts, cur] : roomPts
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                <polygon points={pts.map((q) => `${q.x},${q.y}`).join(' ')} fill="#0a84ff" fillOpacity={0.15} stroke="#0a84ff" strokeWidth={px(2)} strokeDasharray={`${px(8)} ${px(4)}`} />
+                {roomPts.map((q, i) => (
+                  <circle key={i} cx={q.x} cy={q.y} r={px(i === 0 && roomPts.length >= 3 ? 7 : 4)} fill="#0a84ff" />
+                ))}
+              </g>
+            )
+          })()}
 
           {/* Dachflächenfenster */}
           {(floor.skylights ?? []).map((sk) => {

@@ -104,6 +104,26 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         </>
       )}
 
+      {tool === 'room' && (
+        <>
+          <Segmented
+            value={opts.roomMode}
+            onChange={(v) => setOpts({ roomMode: v })}
+            options={[
+              { value: 'auto', label: 'Automatisch', title: 'In einen geschlossenen Raum klicken' },
+              { value: 'rect', label: 'Rechteck', title: 'Zwei Ecken anklicken (z. B. offene Küche)' },
+              { value: 'poly', label: 'Frei', title: 'Eckpunkte anklicken, Start oder Enter schließt' },
+            ]}
+          />
+          {opts.roomMode === 'poly' && (
+            <label className="check">
+              <input type="checkbox" checked={opts.ortho} onChange={(e) => setOpts({ ortho: e.target.checked })} />
+              Rechtwinklig
+            </label>
+          )}
+        </>
+      )}
+
       {tool === 'calibrate' && (
         <span className="opt-text">
           {hasBg ? 'Zwei Punkte mit bekanntem Abstand anklicken' : 'Zuerst einen Grundriss laden'}

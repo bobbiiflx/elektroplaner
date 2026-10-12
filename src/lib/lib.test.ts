@@ -641,3 +641,24 @@ describe('Raumausschnitt der Wandansicht', () => {
     expect(wallSegments(f, f.walls[0], -1)).toHaveLength(0)
   })
 })
+
+describe('Freie Räume', () => {
+  it('Gerät in überlappenden Räumen gehört zum kleineren; eigener Stromkreis per Raum-Schalter', () => {
+    const f = newFloor(DEFAULT_SETTINGS, 'EG')
+    f.rooms = [
+      { id: 'gross', name: 'Wohnen', type: 'living', poly: [{ x: 0, y: 0 }, { x: 8000, y: 0 }, { x: 8000, y: 4000 }, { x: 0, y: 4000 }] },
+      { id: 'kueche', name: 'Küche', type: 'other', ownCircuit: true, poly: [{ x: 4000, y: 0 }, { x: 8000, y: 0 }, { x: 8000, y: 4000 }, { x: 4000, y: 4000 }] },
+    ]
+    f.devices = [
+      { id: 'k1', typeId: 'sd-1', wallId: '', offset: 0, side: 1, height: 300, x: 6000, y: 2000 } as never,
+      { id: 'w1', typeId: 'sd-1', wallId: '', offset: 0, side: 1, height: 300, x: 2000, y: 2000 } as never,
+    ]
+    const p = sampleProject()
+    p.floors = [f]
+    p.circuits = []
+    expect(roomStats(f, f.rooms[1]).sockets).toBe(1)
+    expect(roomStats(f, f.rooms[0]).sockets).toBe(1)
+    const plan = suggestCircuits(p)
+    expect(plan.some((c) => c.name.includes('Küche') && c.deviceIds.length === 1)).toBe(true)
+  })
+})

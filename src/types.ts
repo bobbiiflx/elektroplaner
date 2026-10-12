@@ -126,6 +126,7 @@ export interface Room {
   name: string
   type: RoomType
   poly: Vec2[]
+  ownCircuit?: boolean // Steckdosen dieses Raums bekommen einen eigenen Stromkreis (sonst nach Raumart: Küche, Bad, HWR)
 }
 /** Dachflächenfenster: liegt in der Dachebene `roofId`; c = Mitte im Grundriss, w entlang der Traufe, h entlang der Schräge. */
 export interface Skylight {

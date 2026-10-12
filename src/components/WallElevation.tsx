@@ -3,6 +3,7 @@ import { Maximize, Minus, Plus } from 'lucide-react'
 import { openingDef, isGlazed, electricDefaults, cableType, deviceType, deviceType as deviceTypeById, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Wall } from '../types'
+import { wallSegments } from '../lib/rooms'
 import { clamp, pointOnWall, projectOnWall, uid, wallLength } from '../lib/geom'
 import { routeTo } from '../lib/cableRoute'
 import { autoRef, lockAxis, snapWallPoint, type AutoRef } from '../lib/autoDims'
@@ -51,6 +52,7 @@ export default function WallElevation() {
   const project = useStore((s) => s.project)
   const wallId = useStore((s) => s.elevWallId)
   const side = useStore((s) => s.elevSide)
+  const elevSeg = useStore((s) => s.elevSeg)
   const selection = useStore((s) => s.selection)
   const tool = useStore((s) => s.tool)
   const opts = useStore((s) => s.opts)
@@ -82,6 +84,13 @@ export default function WallElevation() {
   const L = wall ? wallLength(wall) : 0
   const H = wall ? (wall.height ?? floor.wallHeight) : floor.wallHeight
   const profile = useMemo(() => (wall ? wallProfile(floor, wall) : [{ u: 0, h: H }, { u: 0, h: H }]), [floor, wall, H])
+  // Raumausschnitt: nur der Teil der Wand, der an den gewählten Raum grenzt
+  const segs = useMemo(() => (wall ? wallSegments(floor, wall, side) : []), [floor.walls, floor.rooms, wall, side]) // eslint-disable-line react-hooks/exhaustive-deps
+  const seg = elevSeg >= 0 ? segs[Math.min(elevSeg, segs.length - 1)] : undefined
+  const winU0 = seg ? seg.u0 : 0
+  const winU1 = seg ? seg.u1 : L
+  const xa = side === 1 ? winU0 : L - winU1
+  const xb = side === 1 ? winU1 : L - winU0
   const flatTop = profile.every((p) => Math.abs(p.h - H) < 1)
   /** Liegt der Punkt (u, z) über der Dachschräge, also dort, wo keine Wand ist? */
   const aboveRoof = (u: number, z: number) => !flatTop && z > profileAt(profile, clamp(u, 0, L)) - 20
@@ -109,23 +118,24 @@ export default function WallElevation() {
     const padB = 92
     const availW = size.w - padL - padR
     const availH = size.h - padT - padB
-    const sc = clamp(Math.min(availW / (L + 400), availH / (H + 400)), MIN_S, MAX_S)
+    const ww = xb - xa
+    const sc = clamp(Math.min(availW / (ww + 400), availH / (H + 400)), MIN_S, MAX_S)
     setView({
       s: sc,
-      tx: padL + (availW - L * sc) / 2,
+      tx: padL + (availW - ww * sc) / 2 - xa * sc,
       ty: padT + (availH - H * sc) / 2 + H * sc,
     })
-  }, [size.w, size.h, L, H])
+  }, [size.w, size.h, L, H, xa, xb])
 
   const fittedKey = useRef('')
   useEffect(() => {
     if (size.w < 50 || !wall) return
-    const key = `${wall.id}|${side}|${Math.round(L)}|${Math.round(H)}`
+    const key = `${wall.id}|${side}|${Math.round(L)}|${Math.round(H)}|${Math.round(xa)}|${Math.round(xb)}`
     if (fittedKey.current !== key) {
       fittedKey.current = key
       fit()
     }
-  }, [size.w, size.h, wall, side, L, H, fit])
+  }, [size.w, size.h, wall, side, L, H, xa, xb, fit])
 
   // Wand existiert nicht mehr → zurück zum Grundriss
   useEffect(() => {
@@ -632,6 +642,16 @@ export default function WallElevation() {
           )}
           {gridMinor && <rect x={0} y={-H} width={L} height={H} fill="url(#elGridMinor)" clipPath="url(#elWallClip)" style={{ pointerEvents: 'none' }} />}
 
+          {/* Außerhalb des Raumausschnitts: abgeblendet */}
+          {seg && (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={-300} y={-H - 160} width={xa + 300} height={H + 320} fill="var(--canvas)" opacity={0.72} />
+              <rect x={xb} y={-H - 160} width={L + 300 - xb} height={H + 320} fill="var(--canvas)" opacity={0.72} />
+              <line x1={xa} y1={-H - 160} x2={xa} y2={160} stroke="var(--accent)" strokeWidth={px(1.2)} strokeDasharray={`${px(5)} ${px(4)}`} />
+              <line x1={xb} y1={-H - 160} x2={xb} y2={160} stroke="var(--accent)" strokeWidth={px(1.2)} strokeDasharray={`${px(5)} ${px(4)}`} />
+            </g>
+          )}
+
           {/* Installationszonen */}
           {showZones && (
             <g style={{ pointerEvents: 'none' }} clipPath="url(#elWallClip)">
@@ -925,6 +945,10 @@ function WallControls() {
   const wallId = useStore((s) => s.elevWallId)
   const side = useStore((s) => s.elevSide)
   const setSide = useStore((s) => s.setElevSide)
+  const elevSeg = useStore((s) => s.elevSeg)
+  const setElevSeg = useStore((s) => s.setElevSeg)
+  const wallObj = floor.walls.find((w) => w.id === wallId)
+  const segs = useMemo(() => (wallObj ? wallSegments(floor, wallObj, side) : []), [floor.walls, floor.rooms, wallObj, side]) // eslint-disable-line react-hooks/exhaustive-deps
   const openElevation = useStore((s) => s.openElevation)
   const showZones = useStore((s) => s.showZones)
   const toggleZones = useStore((s) => s.toggleZones)
@@ -958,6 +982,16 @@ function WallControls() {
           Seite 2
         </button>
       </div>
+      {segs.length > 0 && (
+        <select className="wall-select" value={elevSeg} onChange={(e) => setElevSeg(+e.target.value)} title="Ausschnitt der Wand">
+          {segs.map((sg, i) => (
+            <option key={i} value={i}>
+              {sg.label} · {formatLen(sg.u1 - sg.u0, unit)}
+            </option>
+          ))}
+          <option value={-1}>Ganze Wand</option>
+        </select>
+      )}
       <button className={'btn small' + (showZones ? ' primary' : '')} onClick={toggleZones} title="Installationszonen nach DIN 18015-3 ein-/ausblenden">
         Zonen
       </button>

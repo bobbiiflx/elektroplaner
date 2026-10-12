@@ -98,6 +98,8 @@ interface State {
   planPane: 'plan' | 'wall'
   elevWallId: string | null
   elevSide: 1 | -1
+  elevSeg: number // gewählter Raumausschnitt der Wandansicht (-1 = ganze Wand)
+  setElevSeg: (i: number) => void
   past: Project[]
   future: Project[]
   lastEdit: { key: string; t: number } | null
@@ -255,6 +257,8 @@ export const useStore = create<State>((set, get) => ({
   planPane: 'plan',
   elevWallId: null,
   elevSide: 1,
+  elevSeg: 0,
+  setElevSeg: (elevSeg) => set({ elevSeg }),
   past: [],
   future: [],
   lastEdit: null,
@@ -435,9 +439,9 @@ export const useStore = create<State>((set, get) => ({
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setAsk: (ask) => set({ ask }),
   setPickerOpen: (pickerOpen) => set({ pickerOpen }),
-  openElevation: (wallId) => set({ planPane: 'wall', elevWallId: wallId, pickerOpen: false }),
+  openElevation: (wallId) => set((s) => ({ planPane: 'wall', elevWallId: wallId, pickerOpen: false, elevSeg: s.elevWallId === wallId ? s.elevSeg : 0 })),
   closeElevation: () => set({ planPane: 'plan', pickerOpen: false }),
-  setElevSide: (elevSide) => set({ elevSide }),
+  setElevSide: (elevSide) => set({ elevSide, elevSeg: 0 }),
   createCable: (points) => {
     if (points.length < 2) return
     const { opts, activeFloorId } = get()

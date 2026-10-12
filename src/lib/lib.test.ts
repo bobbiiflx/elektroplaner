@@ -623,3 +623,21 @@ describe('Autoplanung', () => {
     expect(suggestCircuits(p)).toHaveLength(0)
   })
 })
+
+import { wallSegments } from './rooms'
+describe('Raumausschnitt der Wandansicht', () => {
+  it('teilt eine Wand, die an zwei Räume grenzt, in zwei Abschnitte', () => {
+    const f = newFloor(DEFAULT_SETTINGS, 'EG')
+    const mk = (id: string, a: [number, number], b: [number, number]) => ({ id, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, thickness: 200, kind: 'inner' as const })
+    // Rechteck 8 m × 3 m, Trennwand bei x = 4000
+    f.walls = [mk('a', [0, 0], [8000, 0]), mk('b', [8000, 0], [8000, 3000]), mk('c', [8000, 3000], [0, 3000]), mk('d', [0, 3000], [0, 0]), mk('t', [4000, 0], [4000, 3000])]
+    // Seite 1 der Wand a (Normale zeigt nach +y, also in den Raum)
+    const segs = wallSegments(f, f.walls[0], 1)
+    expect(segs).toHaveLength(2)
+    expect(segs[0].u0).toBeGreaterThanOrEqual(0)
+    expect(segs[0].u1).toBeLessThanOrEqual(3950)
+    expect(segs[1].u0).toBeGreaterThanOrEqual(4050)
+    // Rückseite (Außenseite): kein Raum
+    expect(wallSegments(f, f.walls[0], -1)).toHaveLength(0)
+  })
+})

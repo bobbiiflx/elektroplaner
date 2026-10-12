@@ -1,7 +1,7 @@
 import { deviceType } from '../config/catalog'
 import { roomReq } from '../config/rooms'
-import type { Floor, Project, Room, Vec2 } from '../types'
-import { boundsOf } from './geom'
+import type { Floor, Project, Room, Vec2, Wall } from '../types'
+import { boundsOf, pointOnWall, projectOnWall, wallLength } from './geom'
 import { planPoint } from './runs'
 
 const CELL = 50 // mm
@@ -178,6 +178,43 @@ export function roomStats(floor: Floor, room: Room): RoomStats {
     else if (dt.category === 'switch' || (dt.category === 'knx' && dt.id.startsWith('knx-') && /Taster/.test(dt.name))) s.switches++
   }
   return s
+}
+
+export interface WallSeg {
+  label: string
+  u0: number // Abstand vom Wandanfang
+  u1: number
+}
+
+/**
+ * Abschnitte einer Wand, die an einen Raum der angegebenen Seite grenzen (Raumausschnitt für die Wandansicht).
+ * Festgelegte Räume werden verwendet, sonst wird der Raum an der Wand automatisch erkannt.
+ */
+export function wallSegments(floor: Floor, wall: Wall, side: 1 | -1): WallSeg[] {
+  const L = wallLength(wall)
+  const polys: { name: string; poly: Vec2[] }[] = (floor.rooms ?? []).map((r) => ({ name: r.name, poly: r.poly }))
+  let auto = 0
+  for (let t = 150, n = 0; t < L - 100 && n < 30; t += 400, n++) {
+    const seed = pointOnWall(wall, t, side, wall.thickness / 2 + 150)
+    if (polys.some((p) => pointInPoly(p.poly, seed))) continue
+    const poly = detectRoom(floor, seed)
+    if (poly) polys.push({ name: `Raum ${++auto}`, poly })
+  }
+  const segs: WallSeg[] = []
+  const face = (side * wall.thickness) / 2
+  for (const { name, poly } of polys) {
+    let u0 = Infinity
+    let u1 = -Infinity
+    for (let i = 0; i < poly.length; i++) {
+      const a = projectOnWall(wall, poly[i])
+      const b = projectOnWall(wall, poly[(i + 1) % poly.length])
+      if (Math.abs(a.signed - face) > 100 || Math.abs(b.signed - face) > 100) continue
+      u0 = Math.min(u0, a.t, b.t)
+      u1 = Math.max(u1, a.t, b.t)
+    }
+    if (u1 - u0 > 200) segs.push({ label: name, u0, u1 })
+  }
+  return segs.sort((x, y) => x.u0 - y.u0)
 }
 
 export interface RoomIssue { roomId: string; floorId: string; text: string }

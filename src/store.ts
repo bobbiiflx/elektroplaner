@@ -17,6 +17,7 @@ import { CIRCUIT_COLORS, cableType, type DeviceSpec } from './config/catalog'
 import type { ColorBy } from './lib/completeness'
 import { nextGA } from './lib/groups'
 import { uid } from './lib/geom'
+import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 
 export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'measure' | 'calibrate'
@@ -54,6 +55,10 @@ interface State {
   metas: ProjectMeta[]
   project: Project
   backgrounds: Record<string, string>
+  suggest: { floorId: string; walls: (DetectedWall & { id: string })[] } | null
+  setSuggest: (v: { floorId: string; walls: DetectedWall[] } | null) => void
+  dropSuggestion: (id: string) => void
+  acceptSuggestion: () => void
   activeFloorId: string
   selection: Selection | null
   tool: Tool
@@ -171,6 +176,7 @@ export const useStore = create<State>((set, get) => ({
   metas: [],
   project: initial,
   backgrounds: {},
+  suggest: null,
   activeFloorId: initial.floors[0].id,
   selection: null,
   tool: 'select',
@@ -439,6 +445,20 @@ export const useStore = create<State>((set, get) => ({
       const left = get().project.floors
       set({ activeFloorId: left[Math.max(0, idx - 1)].id, selection: null })
     }
+  },
+
+  setSuggest: (v) => set({ suggest: v ? { floorId: v.floorId, walls: v.walls.map((w) => ({ ...w, id: uid('w_') })) } : null }),
+  dropSuggestion: (id) =>
+    set((s) => (s.suggest ? { suggest: { ...s.suggest, walls: s.suggest.walls.filter((w) => w.id !== id) } } : {})),
+  acceptSuggestion: () => {
+    const sg = get().suggest
+    if (!sg) return
+    get().edit((p) => {
+      const f = p.floors.find((x) => x.id === sg.floorId)
+      if (f) for (const w of sg.walls) f.walls.push({ id: w.id, a: w.a, b: w.b, thickness: w.thickness, kind: w.kind })
+    })
+    set({ suggest: null })
+    get().showToast(`${sg.walls.length} Wände übernommen`)
   },
 
   setBackground: (floorId, dataUrl, bg) => {

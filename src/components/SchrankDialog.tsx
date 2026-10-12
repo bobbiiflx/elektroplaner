@@ -10,6 +10,8 @@ import { useStore } from '../store'
 import { Modal, Segmented } from './ui'
 import { NumberField } from './NumberField'
 import { VAT, materialList } from '../lib/material'
+import { RICHTWERT_NAME } from '../lib/priceSources'
+import PriceImportDialog from './PriceImportDialog'
 
 type Tab = 'circuits' | 'channels' | 'ga' | 'ways' | 'material'
 
@@ -54,6 +56,7 @@ export default function SchrankDialog() {
   const [tab, setTab] = useState<Tab>('circuits')
   const [matFloor, setMatFloor] = useState('')
   const [withRuns, setWithRuns] = useState(true)
+  const [importOpen, setImportOpen] = useState(false)
   const edit = useStore((s) => s.edit)
   const m = (mm: number) => formatLen(mm, unit === 'mm' ? 'm' : unit === 'cm' ? 'm' : unit)
 
@@ -143,7 +146,42 @@ export default function SchrankDialog() {
       )}
       {tab === 'material' ? (
         <div className="schrank-table">
-          <div className="mat-opts">
+          <div className="mat-opts price-src">
+            <select
+              value={project.priceSourceId ?? 'katalog'}
+              title="Preisquelle – eigene Preise (✎) überschreiben sie"
+              onChange={(e) => {
+                if (e.target.value === '__import') setImportOpen(true)
+                else edit((p) => void (p.priceSourceId = e.target.value))
+              }}
+            >
+              <option value="katalog">Preise: Katalog (Standard)</option>
+              <option value="richtwert">Preise: {RICHTWERT_NAME}</option>
+              {(project.priceSources ?? []).map((ps) => (
+                <option key={ps.id} value={ps.id}>
+                  Preise: {ps.name}
+                </option>
+              ))}
+              <option value="__import">Preisliste importieren …</option>
+            </select>
+            {project.priceSources?.some((x) => x.id === project.priceSourceId) && (
+              <button
+                className="btn small danger"
+                onClick={() =>
+                  edit((p) => {
+                    p.priceSources = (p.priceSources ?? []).filter((x) => x.id !== p.priceSourceId)
+                    p.priceSourceId = 'katalog'
+                  })
+                }
+              >
+                Liste löschen
+              </button>
+            )}
+            {Object.keys(project.prices ?? {}).length > 0 && (
+              <button className="btn small" onClick={() => edit((p) => void (p.prices = {}))}>
+                Eigene Preise zurücksetzen
+              </button>
+            )}
             <select value={matFloor} onChange={(e) => setMatFloor(e.target.value)}>
               <option value="">Alle Geschosse</option>
               {project.floors.map((f) => (
@@ -214,7 +252,9 @@ export default function SchrankDialog() {
               </tbody>
             </table>
           </div>
-          <p className="muted small">Preise sind Richtwerte und lassen sich je Position anpassen (✎ = eigener Preis). Die Mengen aus Zuleitungen sind geschätzt.</p>
+          <p className="muted small">
+            Preise sind Richtwerte/Netto-Preise der gewählten Quelle und lassen sich je Position anpassen (✎ = eigener Preis, hat Vorrang). „{RICHTWERT_NAME}“: Leitungen nach Shop-Preisen, Geräte geschätzt – kein Live-Abgleich. Mengen aus Zuleitungen sind geschätzt.
+          </p>
         </div>
       ) : null}
       {tab !== 'material' && current.tables.map(({ title, t }) => (
@@ -223,6 +263,7 @@ export default function SchrankDialog() {
           <DataTable t={t} />
         </div>
       ))}
+    {importOpen && <PriceImportDialog onClose={() => setImportOpen(false)} />}
     </Modal>
   )
 }

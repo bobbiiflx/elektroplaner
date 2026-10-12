@@ -283,3 +283,44 @@ describe('Material', () => {
     expect(l.sum).toBe(1000 * l.qty)
   })
 })
+
+import { detectWalls } from './detectWalls'
+describe('detectWalls', () => {
+  it('erkennt Raum mit Innenwand, überbrückt Tür, ignoriert dünne Linien', () => {
+    const W = 700, H = 500, mm = 10 // 7 m x 5 m
+    const g = new Uint8Array(W * H).fill(255)
+    const rect = (x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) g[y * W + x] = 0 }
+    rect(50, 50, 650, 70) // oben 200 mm
+    rect(50, 430, 650, 450) // unten
+    rect(50, 50, 70, 450) // links
+    rect(630, 50, 650, 450) // rechts
+    rect(350, 70, 360, 430) // Innenwand 100 mm
+    for (let x = 80; x < 620; x++) g[250 * W + x] = 0 // dünne Maßlinie
+    for (let y = 250; y < 290; y++) for (let x = 350; x < 360; x++) g[y * W + x] = 255 // Tür in Innenwand
+    const walls = detectWalls(g, W, H, mm)
+    const hs = walls.filter((w) => w.a.y === w.b.y), vs = walls.filter((w) => w.a.x === w.b.x)
+    expect(hs.length).toBe(2)
+    expect(vs.length).toBe(3)
+    expect(vs.some((w) => Math.abs(w.a.x - 3550) < 200)).toBe(true)
+    const inner = vs.find((w) => Math.abs(w.a.x - 3550) < 200)!
+    expect(Math.abs(inner.a.x - 3550)).toBeLessThan(60)
+    expect(Math.abs(Math.abs(inner.b.y - inner.a.y) - 3600)).toBeLessThan(400)
+  })
+})
+
+import { parsePriceText, matchRow, priceCandidates, parseNumber } from './priceSources'
+describe('Preislisten-Import', () => {
+  it('liest deutsche Zahlenformate', () => {
+    expect(parseNumber('1.234,56 €')).toBe(1234.56)
+    expect(parseNumber('12,50')).toBe(12.5)
+    expect(parseNumber('12.50')).toBe(12.5)
+  })
+  it('parst CSV und Freitext und ordnet zu', () => {
+    const rows = parsePriceText('Artikel;Menge;Preis\nSchuko Steckdose 2-fach;1;14,90 €\nNYM-J 3x2,5 Meterware - 1,57 €\nNYM-J 5x1,5;;1,60')
+    expect(rows.map((r) => r.price)).toEqual([14.9, 1.57, 1.6])
+    const c = priceCandidates()
+    expect(matchRow(rows[0].name, c)?.key).toBe('dev:sd-2')
+    expect(matchRow(rows[1].name, c)?.key).toBe('cab:nym-3x2.5')
+    expect(matchRow(rows[2].name, c)?.key).toBe('cab:nym-5x1.5')
+  })
+})

@@ -57,6 +57,10 @@ export default function Editor2D() {
   const floor = useFloor()
   const project = useStore((s) => s.project)
   const backgrounds = useStore((s) => s.backgrounds)
+  const suggest = useStore((s) => s.suggest)
+  const dropSuggestion = useStore((s) => s.dropSuggestion)
+  const acceptSuggestion = useStore((s) => s.acceptSuggestion)
+  const setSuggest = useStore((s) => s.setSuggest)
   const selection = useStore((s) => s.selection)
   const tool = useStore((s) => s.tool)
   const opts = useStore((s) => s.opts)
@@ -755,6 +759,29 @@ export default function Editor2D() {
             )
           })}
 
+          {/* Vorgeschlagene Wände (Erkennung) */}
+          {suggest?.floorId === floor.id &&
+            suggest.walls.map((w) => (
+              <line
+                key={w.id}
+                x1={w.a.x}
+                y1={w.a.y}
+                x2={w.b.x}
+                y2={w.b.y}
+                stroke="#ff9500"
+                strokeWidth={w.thickness}
+                strokeLinecap="butt"
+                opacity={0.6}
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  dropSuggestion(w.id)
+                }}
+              >
+                <title>Klicken zum Entfernen</title>
+              </line>
+            ))}
+
           {/* Öffnungen */}
           {floor.openings.map((o) => {
             const w = floor.walls.find((x) => x.id === o.wallId)
@@ -1025,6 +1052,18 @@ export default function Editor2D() {
           <Maximize size={16} />
         </button>
       </div>
+
+      {suggest?.floorId === floor.id && (
+        <div className="suggest-bar">
+          <span>{suggest.walls.length} erkannte Wände · Wand anklicken = entfernen</span>
+          <button className="btn small primary" disabled={!suggest.walls.length} onClick={acceptSuggestion}>
+            Übernehmen
+          </button>
+          <button className="btn small" onClick={() => setSuggest(null)}>
+            Verwerfen
+          </button>
+        </div>
+      )}
 
       <div className="status">
         <span className="hint-text">{HINTS[tool]}</span>

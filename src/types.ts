@@ -178,8 +178,17 @@ export interface Project {
   floors: Floor[]
   circuits?: Circuit[]
   groups?: Group[]
+  priceSources?: PriceSource[] // importierte Preislisten
+  priceSourceId?: string // 'katalog' | 'richtwert' | PriceSource.id
   prices?: Record<string, number> // eigene Einzelpreise (€) je Position, überschreiben die Richtwerte
   scenes?: Scene[]
+}
+
+export interface PriceSource {
+  id: string
+  name: string
+  date: string // ISO
+  prices: Record<string, number> // Netto-€ je Positions-Schlüssel (dev:/box:/cab:/act:)
 }
 
 export interface ProjectMeta {

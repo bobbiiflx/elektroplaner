@@ -2,6 +2,7 @@ import { cableType, deviceType, resolveDevice } from '../config/catalog'
 import type { Project } from '../types'
 import { cableLengths } from './geom'
 import { kindOf } from '../config/catalog'
+import { sourcePrices } from './priceSources'
 import { actuatorChannels, actuatorNeeds, wayRows } from './schrank'
 
 export type MatGroup = 'Geräte' | 'Verteiler & Dosen' | 'Leitungen (gezeichnet)' | 'Zuleitungen zum Verteiler (geschätzt)' | 'Aktoren (Richtwert)'
@@ -29,14 +30,19 @@ export interface MatOptions {
   includeRuns?: boolean
 }
 
+export const ACTUATOR_LABELS = Object.keys(ACTUATOR_PRICE)
+
 export const VAT = 0.19
 
 export function materialList(project: Project, opts: MatOptions = {}): { lines: MatLine[]; net: number } {
   const prices = project.prices ?? {}
+  const src = sourcePrices(project)
+  const fromSrc = (key: string, d: number) => src[key.startsWith('run:') ? 'cab:' + key.slice(4) : key] ?? d
   const map = new Map<string, MatLine>()
   const add = (key: string, group: MatGroup, name: string, unit: 'Stk' | 'm', qty: number, defaultPrice: number, note?: string) => {
     let l = map.get(key)
     if (!l) {
+      defaultPrice = fromSrc(key, defaultPrice)
       const price = prices[key] ?? defaultPrice
       l = { key, group, name, unit, qty: 0, defaultPrice, price, sum: 0, note }
       map.set(key, l)

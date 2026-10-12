@@ -70,7 +70,7 @@ interface ExportFile {
 
 export function exportJson(project: Project, backgrounds: Record<string, string>): string {
   const bg: Record<string, string> = {}
-  for (const f of project.floors) if (backgrounds[f.id]) bg[f.id] = backgrounds[f.id]
+  for (const f of project.floors) for (const k of [f.id, f.id + '~mask']) if (backgrounds[k]) bg[k] = backgrounds[k]
   const file: ExportFile = { app: 'elektroplaner', version: 1, project, backgrounds: bg }
   return JSON.stringify(file)
 }

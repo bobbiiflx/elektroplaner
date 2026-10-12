@@ -33,6 +33,13 @@ export const DEFAULT_CLASSES: ColorClass[] = [
   { id: 'dark', name: 'Schwarz / dunkel', kind: 'dark', tol: 110, mode: 'wall', on: true },
 ]
 
+/** Klassen für die aus dem PDF gezeichnete Vektor-Maske (Schraffur schwarz/rot, Abbruch gelb). */
+export const VECTOR_CLASSES: ColorClass[] = [
+  { id: 'v-yellow', name: 'Gelb (Abbruch)', kind: 'color', rgb: [255, 255, 0], tol: 70, mode: 'ignore', on: true },
+  { id: 'v-red', name: 'Rote Schraffur (Neubau)', kind: 'color', rgb: [255, 0, 0], tol: 110, mode: 'wall', on: true },
+  { id: 'v-black', name: 'Schwarze Schraffur (Bestand)', kind: 'dark', tol: 140, mode: 'wall', on: true },
+]
+
 /** Pixelklassen: 1 = Wand, 2 = Umriss, 3 = ignorieren, 0 = sonst. Erste passende aktive Klasse gewinnt. */
 export function classifyPixels(d: ArrayLike<number>, n: number, classes: ColorClass[]): Uint8Array {
   const cls = new Uint8Array(n)

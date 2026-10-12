@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, X } from 'lucide-react'
+import { renderWallMask } from '../lib/pdfVector'
 import { mmPerPxFromScale, pageTexts, renderPage, type PdfDoc } from '../lib/pdf'
 import { clampRect, inkBBox, labelsFromText, levelOf, nameBlocks, splitByWhitespace, type Rect } from '../lib/sheet'
 import { useStore } from '../store'
@@ -188,7 +189,15 @@ export default function SheetSplit({ source, onClose }: { source: SheetSource; o
         cv.height = sh
         cv.getContext('2d')!.drawImage(bim, sx, sy, sw, sh, 0, 0, sw, sh)
         guessWidth = guessWidth || sw
-        items.push({ name: r.name.trim() || 'Geschoss', dataUrl: cv.toDataURL('image/png'), bg: { width: sw, height: sh, mmPerPx, opacity: 0.7, source: `${source.fileName} · ${r.name}`, sheetId } })
+        let mask: string | null = null
+        if (source.doc && 'pxPerPt' in big) {
+          try {
+            mask = await renderWallMask(source.doc, source.page ?? 1, { scale: (big as { pxPerPt: number }).pxPerPt, x: sx, y: sy, w: sw, h: sh, ptToMm: (denom * 25.4) / 72 })
+          } catch {
+            /* ohne Vektor-Maske */
+          }
+        }
+        items.push({ name: r.name.trim() || 'Geschoss', mask, dataUrl: cv.toDataURL('image/png'), bg: { width: sw, height: sh, mmPerPx, opacity: 0.7, source: `${source.fileName} · ${r.name}`, sheetId } })
       }
       const fallback = 12000 / (guessWidth || 1)
       for (const it of items) if (!it.bg.mmPerPx) it.bg.mmPerPx = fallback

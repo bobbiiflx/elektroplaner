@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { renderWallMask } from '../lib/pdfVector'
 import { loadImage, mmPerPxFromScale, openPdf, renderPage, type PdfDoc } from '../lib/pdf'
 import { useStore } from '../store'
 import { NumberField } from './NumberField'
@@ -112,6 +113,12 @@ function ImportInner({ file }: { file: File }) {
           opacity: 0.7,
           source: `${file.name} · Seite ${no}`,
         })
+        try {
+          const mk = await renderWallMask(doc, no, { scale: r.pxPerPt, x: 0, y: 0, w: r.width, h: r.height, ptToMm: (denom * 25.4) / 72 })
+          useStore.getState().setMask(fid, mk)
+        } catch {
+          /* ohne Vektor-Maske */
+        }
       }
       const s2 = useStore.getState()
       s2.setActiveFloor(firstFloor)

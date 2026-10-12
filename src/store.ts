@@ -59,7 +59,8 @@ interface State {
   setWallDetectOpen: (v: boolean) => void
   ghostBelow: boolean
   setGhostBelow: (v: boolean) => void
-  addSheetFloors: (items: { name: string; dataUrl: string; bg: Background }[]) => string[]
+  addSheetFloors: (items: { name: string; dataUrl: string; bg: Background; mask?: string | null }[]) => string[]
+  setMask: (floorId: string, dataUrl: string | null) => void
   suggest: { floorId: string; walls: (DetectedWall & { id: string })[] } | null
   setSuggest: (v: { floorId: string; walls: DetectedWall[] } | null) => void
   dropSuggestion: (id: string) => void
@@ -364,6 +365,8 @@ export const useStore = create<State>((set, get) => ({
     for (const f of p.floors) {
       const bg = await storage.loadBackground(p.id, f.id)
       if (bg) backgrounds[f.id] = bg
+      const mk = await storage.loadBackground(p.id, f.id + '~mask')
+      if (mk) backgrounds[f.id + '~mask'] = mk
     }
     try {
       localStorage.setItem(LAST_KEY, id)
@@ -412,6 +415,7 @@ export const useStore = create<State>((set, get) => ({
     await storage.saveProject(p)
     for (const f of p.floors) {
       if (backgrounds[f.id]) await storage.saveBackground(p.id, f.id, backgrounds[f.id])
+      if (backgrounds[f.id + '~mask']) await storage.saveBackground(p.id, f.id + '~mask', backgrounds[f.id + '~mask'])
     }
     set({ metas: await storage.listProjects() })
     await get().openProject(p.id)
@@ -450,6 +454,7 @@ export const useStore = create<State>((set, get) => ({
       p.floors = p.floors.filter((f) => f.id !== id)
     })
     void storage.deleteBackground(project.id, id)
+    void storage.deleteBackground(project.id, id + '~mask')
     if (activeFloorId === id) {
       const left = get().project.floors
       set({ activeFloorId: left[Math.max(0, idx - 1)].id, selection: null })
@@ -497,9 +502,28 @@ export const useStore = create<State>((set, get) => ({
     items.forEach((it, i) => {
       bgs[ids[i]] = it.dataUrl
       void storage.saveBackground(pid, ids[i], it.dataUrl)
+      if (it.mask) {
+        bgs[ids[i] + '~mask'] = it.mask
+        void storage.saveBackground(pid, ids[i] + '~mask', it.mask)
+      }
     })
     set({ backgrounds: bgs, activeFloorId: ids[0], selection: null })
     return ids
+  },
+
+  setMask: (floorId, dataUrl) => {
+    const pid = get().project.id
+    if (dataUrl) {
+      void storage.saveBackground(pid, floorId + '~mask', dataUrl)
+      set((s) => ({ backgrounds: { ...s.backgrounds, [floorId + '~mask']: dataUrl } }))
+    } else {
+      void storage.deleteBackground(pid, floorId + '~mask')
+      set((s) => {
+        const b = { ...s.backgrounds }
+        delete b[floorId + '~mask']
+        return { backgrounds: b }
+      })
+    }
   },
 
   setBackground: (floorId, dataUrl, bg) => {
@@ -515,9 +539,11 @@ export const useStore = create<State>((set, get) => ({
   clearBackground: (floorId) => {
     const pid = get().project.id
     void storage.deleteBackground(pid, floorId)
+    void storage.deleteBackground(pid, floorId + '~mask')
     set((s) => {
       const b = { ...s.backgrounds }
       delete b[floorId]
+      delete b[floorId + '~mask']
       return { backgrounds: b }
     })
     get().edit((p) => {

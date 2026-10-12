@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Pipette, X } from 'lucide-react'
-import { DEFAULT_CLASSES, classifyPixels, detectWallsCls, type ClassMode, type ColorClass, type DetectedWall, type DetectOpts } from '../lib/detectWalls'
+import { DEFAULT_CLASSES, VECTOR_CLASSES, classifyPixels, detectWallsCls, type ClassMode, type ColorClass, type DetectedWall, type DetectOpts } from '../lib/detectWalls'
 import { uid } from '../lib/geom'
 import { useStore } from '../store'
 import { Modal } from './ui'
@@ -10,6 +10,7 @@ const DEFAULT_PARAMS: Params = { minThickness: 80, maxThickness: 500, minLength:
 
 // Einstellungen bleiben für das nächste Geschoss erhalten
 let lastClasses: ColorClass[] = DEFAULT_CLASSES
+let lastVector: ColorClass[] = VECTOR_CLASSES
 let lastParams: Params = DEFAULT_PARAMS
 
 const MODE_LABEL: Record<ClassMode, string> = { wall: 'Wand (gefüllt / schraffiert)', outline: 'Wand (umrandete Fläche)', ignore: 'Ignorieren' }
@@ -39,11 +40,16 @@ function Inner() {
   const floorId = useStore((s) => s.activeFloorId)
   const floor = useStore((s) => s.project.floors.find((f) => f.id === s.activeFloorId)!)
   const url = useStore((s) => s.backgrounds[s.activeFloorId])
+  const maskSrc = useStore((s) => s.backgrounds[s.activeFloorId + '~mask'])
   const edit = useStore((s) => s.edit)
   const showToast = useStore((s) => s.showToast)
   const bg = floor.background
 
-  const [classes, setClasses] = useState<ColorClass[]>(lastClasses)
+  const [useVec, setUseVec] = useState(!!maskSrc)
+  const [classesR, setClassesR] = useState<ColorClass[]>(lastClasses)
+  const [classesV, setClassesV] = useState<ColorClass[]>(lastVector)
+  const classes = useVec ? classesV : classesR
+  const setClasses = useVec ? setClassesV : setClassesR
   const [params, setParams] = useState<Params>(lastParams)
   const [showMask, setShowMask] = useState(false)
   const [pick, setPick] = useState(false)
@@ -83,16 +89,17 @@ function Inner() {
       setClasses((c) => [...c])
     }
     im.onerror = () => setError('Bild konnte nicht gelesen werden')
-    im.src = url
+    im.src = useVec && maskSrc ? maskSrc : url
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url])
+  }, [url, maskSrc, useVec])
 
   // Erkennung (entprellt)
   useEffect(() => {
-    lastClasses = classes
+    if (useVec) lastVector = classes
+    else lastClasses = classes
     lastParams = params
     const d = data.current
     if (!d) return
@@ -116,7 +123,7 @@ function Inner() {
       } else setMaskUrl('')
     }, 150)
     return () => clearTimeout(t)
-  }, [classes, params, showMask, busy])
+  }, [classes, params, showMask, busy, useVec])
 
   const active = useMemo(() => walls.filter((w) => !off.has(key(w))), [walls, off])
   const setClass = (id: string, patch: Partial<ColorClass>) => setClasses((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)))
@@ -267,6 +274,11 @@ function Inner() {
         </div>
 
         <div className="wd-side">
+          {maskSrc && (
+            <label className="check" style={{ marginBottom: 8 }}>
+              <input type="checkbox" checked={useVec} onChange={(e) => { setBusy(true); setUseVec(e.target.checked) }} /> <b>Vektor-Maske aus dem PDF</b> (Schraffur &amp; Abbruch exakt, empfohlen)
+            </label>
+          )}
           <h4>Farben</h4>
           {classes.map((c) => (
             <div key={c.id} className={'wd-class' + (c.on ? '' : ' off')}>
@@ -294,7 +306,7 @@ function Inner() {
             <button className={'btn small' + (pick ? ' primary' : '')} onClick={() => setPick((v) => !v)}>
               <Pipette size={14} style={{ verticalAlign: -2 }} /> Muster aus Plan aufnehmen
             </button>
-            <button className="btn small" onClick={() => setClasses(DEFAULT_CLASSES)}>
+            <button className="btn small" onClick={() => setClasses(useVec ? VECTOR_CLASSES : DEFAULT_CLASSES)}>
               Zurücksetzen
             </button>
           </div>

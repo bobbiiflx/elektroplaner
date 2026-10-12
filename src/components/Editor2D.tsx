@@ -37,6 +37,10 @@ type Drag =
   | { kind: 'opening'; id: string }
   | { kind: 'wallEnd'; id: string; end: 'a' | 'b'; joined: WallEnd[] }
   | { kind: 'cableNode'; id: string; idx: number }
+  | { kind: 'shape'; what: ShapeKind; id: string; start: Vec2; a0: Vec2; b0: Vec2 }
+  | { kind: 'shapePt'; what: ShapeKind; id: string; pt: 'a' | 'b' | 'depth' }
+
+type ShapeKind = 'roof' | 'dormer' | 'loggia'
 
 interface View {
   tx: number
@@ -689,6 +693,34 @@ export default function Editor2D() {
         const f = p.floors.find((x) => x.id === floor.id)
         if (f) moveEnds(f, d.joined, q)
       }, `wall:${d.id}:${d.end}`)
+    } else if (d.kind === 'shape' || d.kind === 'shapePt') {
+      const gr = settings.grid
+      const rd = (v: number) => Math.round(v / gr) * gr
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (!f) return
+        const sh = d.what === 'roof' ? f.roofs?.find((x) => x.id === d.id) : d.what === 'dormer' ? f.dormers?.find((x) => x.id === d.id) : f.loggias?.find((x) => x.id === d.id)
+        if (!sh) return
+        if (d.kind === 'shape') {
+          const dx = rd(raw.x - d.start.x), dy = rd(raw.y - d.start.y)
+          sh.a = { x: d.a0.x + dx, y: d.a0.y + dy }
+          sh.b = { x: d.b0.x + dx, y: d.b0.y + dy }
+        } else if (d.pt === 'depth') {
+          if ('depth' in sh) {
+            const L = Math.hypot(sh.b.x - sh.a.x, sh.b.y - sh.a.y) || 1
+            const nx = (-(sh.b.y - sh.a.y) / L) * sh.side, ny = ((sh.b.x - sh.a.x) / L) * sh.side
+            sh.depth = Math.max(300, rd((raw.x - sh.a.x) * nx + (raw.y - sh.a.y) * ny))
+          }
+        } else {
+          const q = snap(raw, d.pt === 'a' ? sh.b : sh.a, opts.ortho, true).p
+          sh[d.pt] = { x: q.x, y: q.y }
+        }
+        if (d.what === 'loggia') {
+          const lg = sh as NonNullable<typeof f.loggias>[number]
+          const w = lg.parapetWallId ? f.walls.find((x) => x.id === lg.parapetWallId) : undefined
+          if (w) { w.a = { ...lg.a }; w.b = { ...lg.b } }
+        }
+      }, `shape:${d.id}`)
     } else if (d.kind === 'cableNode') {
       const { p: q } = snap(raw, undefined, false, true)
       edit((p) => {
@@ -762,6 +794,30 @@ export default function Editor2D() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, tool, floor.walls])
   const gapGhost = useMemo(() => (cursor && tool === 'opening' ? openingTarget(cursor).gap : null), [cursor, tool, floor.walls]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Griffe zum Ziehen der Eckpunkte (und der Tiefe bei Gaube/Loggia) */
+  const shapeHandles = (what: ShapeKind, id: string, a: Vec2, b: Vec2, corners?: Vec2[]) => {
+    const dot = (pt: 'a' | 'b' | 'depth', x: number, y: number) => (
+      <circle
+        key={pt}
+        cx={x}
+        cy={y}
+        r={px(6)}
+        fill="var(--paper)"
+        stroke="var(--accent)"
+        strokeWidth={px(2)}
+        style={{ cursor: 'grab' }}
+        onPointerDown={(e) => beginElementDrag(e, { kind: 'shapePt', what, id, pt })}
+      />
+    )
+    return (
+      <g>
+        {dot('a', a.x, a.y)}
+        {dot('b', b.x, b.y)}
+        {corners && dot('depth', (corners[2].x + corners[3].x) / 2, (corners[2].y + corners[3].y) / 2)}
+      </g>
+    )
+  }
 
   const label = (text: string, x: number, y: number, rot = 0, color = 'var(--ink)') => {
     const flip = rot > 90 || rot < -90 ? rot + 180 : rot
@@ -909,12 +965,13 @@ export default function Editor2D() {
                   ) : null,
                 )}
                 <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke={sel ? 'var(--accent)' : '#ff9f0a'} strokeWidth={px(sel ? 3.5 : 2.5)} strokeDasharray={`${px(10)} ${px(5)}`} style={{ pointerEvents: 'none' }} />
-                <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke="transparent" strokeWidth={px(14)} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'stroke' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'roof', id: r.id })} />
+                <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke="transparent" strokeWidth={px(14)} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'stroke' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'roof', id: r.id, start: toPlan(e.clientX, e.clientY), a0: { ...r.a }, b0: { ...r.b } }, { kind: 'roof', id: r.id })} />
                 {/* Anstiegsrichtung */}
                 <g style={{ pointerEvents: 'none' }} stroke={sel ? 'var(--accent)' : '#ff9f0a'} strokeWidth={px(2)} fill="none">
                   <line x1={mid.x} y1={mid.y} x2={mid.x + n.x * px(28)} y2={mid.y + n.y * px(28)} />
                   <path d={`M ${mid.x + n.x * px(28) - n.x * px(7) - n.y * px(5)} ${mid.y + n.y * px(28) - n.y * px(7) + n.x * px(5)} L ${mid.x + n.x * px(28)} ${mid.y + n.y * px(28)} L ${mid.x + n.x * px(28) - n.x * px(7) + n.y * px(5)} ${mid.y + n.y * px(28) - n.y * px(7) - n.x * px(5)}`} />
                 </g>
+                {sel && tool === 'select' && shapeHandles('roof', r.id, r.a, r.b)}
                 {label(`${formatLen(r.knee, unit)} · ${Math.round(r.angle)}°`, mid.x + n.x * px(42), mid.y + n.y * px(42), ang, '#c77c0a')}
               </g>
             )
@@ -949,7 +1006,8 @@ export default function Editor2D() {
             return (
               <g key={d.id}>
                 <polygon points={pts} fill="#ff9f0a" opacity={0.14} style={{ pointerEvents: 'none' }} />
-                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#c77c0a'} strokeWidth={px(sel ? 3 : 2)} strokeDasharray={`${px(8)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'dormer', id: d.id })} />
+                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#c77c0a'} strokeWidth={px(sel ? 3 : 2)} strokeDasharray={`${px(8)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'dormer', id: d.id, start: toPlan(e.clientX, e.clientY), a0: { ...d.a }, b0: { ...d.b } }, { kind: 'dormer', id: d.id })} />
+                {sel && tool === 'select' && shapeHandles('dormer', d.id, d.a, d.b, rectCorners(d))}
                 {label(`Gaube · ${formatLen(d.height, unit)}`, mid.x, mid.y, 0, '#c77c0a')}
               </g>
             )
@@ -962,7 +1020,8 @@ export default function Editor2D() {
             return (
               <g key={l.id}>
                 <polygon points={pts} fill="#0a84ff" opacity={0.12} style={{ pointerEvents: 'none' }} />
-                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#0a84ff'} strokeWidth={px(sel ? 3 : 1.6)} strokeDasharray={`${px(3)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'loggia', id: l.id })} />
+                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#0a84ff'} strokeWidth={px(sel ? 3 : 1.6)} strokeDasharray={`${px(3)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'loggia', id: l.id, start: toPlan(e.clientX, e.clientY), a0: { ...l.a }, b0: { ...l.b } }, { kind: 'loggia', id: l.id })} />
+                {sel && tool === 'select' && shapeHandles('loggia', l.id, l.a, l.b, rectCorners(l))}
                 {label(`Loggia · ${rectArea(l).toFixed(1).replace('.', ',')} m²`, mid.x, mid.y, 0, '#0a6fd0')}
               </g>
             )

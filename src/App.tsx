@@ -7,6 +7,7 @@ import SettingsDialog from './components/SettingsDialog'
 import ToolRail, { TOOLS } from './components/ToolRail'
 import TopBar from './components/TopBar'
 import WallElevation from './components/WallElevation'
+const PrintView = lazy(() => import('./components/PrintView'))
 import { useStore } from './store'
 
 const View3D = lazy(() => import('./components/View3D'))
@@ -21,6 +22,7 @@ export default function App() {
   const ready = useStore((s) => s.ready)
   const viewMode = useStore((s) => s.viewMode)
   const planPane = useStore((s) => s.planPane)
+  const printOpen = useStore((s) => s.printOpen)
 
   useEffect(() => {
     void useStore.getState().init()
@@ -68,6 +70,12 @@ export default function App() {
   }, [])
 
   if (!ready) return <div className="app loading">Lade …</div>
+  if (printOpen)
+    return (
+      <Suspense fallback={<div className="app loading">Druckansicht wird vorbereitet …</div>}>
+        <PrintView />
+      </Suspense>
+    )
 
   return (
     <div className="app">

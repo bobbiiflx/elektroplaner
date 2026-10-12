@@ -995,3 +995,86 @@ p {
 .dev-icon img {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18));
 }
+
+/* ---- Druckansicht ------------------------------------------------------ */
+.printview {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  z-index: 50;
+}
+.pv-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  flex-wrap: wrap;
+}
+.pv-bar .spacer { flex: 1 }
+.pv-opt { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; cursor: pointer }
+.pv-pages {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  zoom: 0.62;
+}
+/* Papier ist immer hell – unabhängig vom Dark Mode */
+.pv-sheet {
+  --canvas: #ffffff; --paper: #ffffff; --ink: #1d1d1f; --ink-soft: #6e6e73; --line: rgba(0,0,0,.18);
+  --accent: #0071e3; --wall: #2c2c2e; --ok: #1d8a3a; --field: rgba(0,0,0,.06); --plate: #fbfbfd; --dim: #0a4a9a;
+  background: #fff;
+  color: #1d1d1f;
+  box-sizing: border-box;
+  box-shadow: 0 4px 24px rgba(0,0,0,.25);
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  font-size: 8.5pt;
+  overflow: hidden;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.pv-body { overflow: hidden; flex: none }
+.pv-title {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.3fr;
+  gap: 6mm;
+  align-items: center;
+  border-top: 0.4mm solid #1d1d1f;
+  font-size: 8pt;
+}
+.pv-title > div:first-child { display: flex; flex-direction: column }
+.pv-title span { color: #6e6e73 }
+.pv-main { font-weight: 700; font-size: 11pt; text-align: center }
+.pv-meta { display: flex; gap: 3mm; justify-content: flex-end; color: #6e6e73; flex-wrap: wrap }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 8pt }
+.pv-table th { text-align: left; font-weight: 700; border-bottom: 0.35mm solid #1d1d1f; padding: 1mm 1.5mm; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .03em }
+.pv-table td { border-bottom: 0.2mm solid rgba(0,0,0,.25); padding: 0 1.5mm; height: 6.4mm; vertical-align: middle }
+.pv-check { display: inline-flex; align-items: center; gap: 1mm; margin-right: 3mm; white-space: nowrap }
+.pv-check i { width: 3.2mm; height: 3.2mm; border: 0.3mm solid #1d1d1f; border-radius: 0.5mm; display: inline-block }
+.pv-muted { color: #6e6e73; font-size: 8pt }
+.printview .pv-bar .pv-muted { color: var(--ink-soft); font-size: 12px }
+.pv-legend { flex: none; font-size: 8pt; border-left: 0.2mm solid rgba(0,0,0,.2); padding-left: 3mm; overflow: hidden }
+.pv-legend h4 { margin: 3mm 0 1.5mm; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .04em; color: #6e6e73 }
+.pv-legend h4:first-child { margin-top: 0 }
+.pv-leg-row { display: grid; grid-template-columns: 5mm 1fr auto; gap: 2mm; align-items: center; margin-bottom: 1mm }
+.pv-line { display: inline-block; width: 5mm; height: 0.9mm; border-radius: 1mm }
+
+@media print {
+  html, body, #root { background: #fff !important; height: auto !important; overflow: visible !important }
+  .printview { position: static; display: block; background: #fff }
+  .pv-bar { display: none }
+  .pv-pages { zoom: 1; padding: 0; gap: 0; display: block; overflow: visible }
+  .pv-sheet { box-shadow: none; break-after: page; page-break-after: always }
+}

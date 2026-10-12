@@ -9,6 +9,7 @@ import { syncDeviceNodes } from '../lib/link'
 import { horizontalBands, verticalSpans } from '../lib/zones'
 import { formatLen } from '../lib/units'
 import { DeviceFace } from './DeviceIcons'
+import { ElevationDims } from './dims'
 import { PaneSwitch } from './PaneSwitch'
 import { ToolOptionsBar } from './ToolOptionsBar'
 
@@ -51,6 +52,7 @@ export default function WallElevation() {
   const opts = useStore((s) => s.opts)
   const unit = useStore((s) => s.unit)
   const showZones = useStore((s) => s.showZones)
+  const showDims = useStore((s) => s.showDims)
   const edit = useStore((s) => s.edit)
   const select = useStore((s) => s.select)
   const setTool = useStore((s) => s.setTool)
@@ -657,6 +659,8 @@ export default function WallElevation() {
             )
           })}
 
+          {showDims && <ElevationDims wall={wall} H={H} side={side} devices={devicesHere} openings={openingsHere} unit={unit} px={px} kOf={kOf} />}
+
           {/* Maße des gewählten Geräts */}
           {selDevice && (() => {
             const cx = X(selDevice.offset)
@@ -804,6 +808,8 @@ function WallControls() {
   const openElevation = useStore((s) => s.openElevation)
   const showZones = useStore((s) => s.showZones)
   const toggleZones = useStore((s) => s.toggleZones)
+  const showDims = useStore((s) => s.showDims)
+  const toggleDims = useStore((s) => s.toggleDims)
   const unit = useStore((s) => s.unit)
   const select = useStore((s) => s.select)
 
@@ -834,6 +840,9 @@ function WallControls() {
       </div>
       <button className={'btn small' + (showZones ? ' primary' : '')} onClick={toggleZones} title="Installationszonen nach DIN 18015-3 ein-/ausblenden">
         Zonen
+      </button>
+      <button className={'btn small' + (showDims ? ' primary' : '')} onClick={toggleDims} title="Bemaßung ein-/ausblenden">
+        Maße
       </button>
     </>
   )

@@ -54,6 +54,8 @@ interface State {
   unit: Unit
   viewMode: ViewMode
   showZones: boolean
+  showDims: boolean
+  printOpen: boolean
   showAllFloors: boolean
   ghostWalls: boolean
   toast: string | null
@@ -79,6 +81,8 @@ interface State {
   setUnit: (u: Unit) => void
   setViewMode: (v: ViewMode) => void
   toggleZones: () => void
+  toggleDims: () => void
+  setPrintOpen: (v: boolean) => void
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
   showToast: (msg: string) => void
@@ -131,6 +135,8 @@ export const useStore = create<State>((set, get) => ({
   unit: 'cm',
   viewMode: 'split',
   showZones: false,
+  showDims: true,
+  printOpen: false,
   showAllFloors: false,
   ghostWalls: false,
   toast: null,
@@ -201,6 +207,8 @@ export const useStore = create<State>((set, get) => ({
   setUnit: (unit) => set({ unit }),
   setViewMode: (viewMode) => set({ viewMode }),
   toggleZones: () => set((s) => ({ showZones: !s.showZones })),
+  toggleDims: () => set((s) => ({ showDims: !s.showDims })),
+  setPrintOpen: (printOpen) => set({ printOpen }),
   toggleAllFloors: () => set((s) => ({ showAllFloors: !s.showAllFloors })),
   toggleGhostWalls: () => set((s) => ({ ghostWalls: !s.ghostWalls })),
   openImport: (importFile) => set({ importFile }),

@@ -17,6 +17,7 @@ import {
 } from '../lib/geom'
 import { findJoined, moveEnds, syncDeviceNodes, type WallEnd } from '../lib/link'
 import { formatLen } from '../lib/units'
+import { PlanDims } from './dims'
 import { LenField } from './NumberField'
 import { routeTo } from '../lib/cableRoute'
 import { PlanSymbolShape } from './DeviceIcons'
@@ -57,6 +58,7 @@ export default function Editor2D() {
   const tool = useStore((s) => s.tool)
   const opts = useStore((s) => s.opts)
   const unit = useStore((s) => s.unit)
+  const showDims = useStore((s) => s.showDims)
   const edit = useStore((s) => s.edit)
   const select = useStore((s) => s.select)
   const setTool = useStore((s) => s.setTool)
@@ -728,6 +730,8 @@ export default function Editor2D() {
               </g>
             )
           })}
+
+          {showDims && <PlanDims floor={floor} unit={unit} px={px} />}
 
           {/* Geräte */}
           {floor.devices.map((d) => {

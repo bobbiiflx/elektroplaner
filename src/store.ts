@@ -59,6 +59,8 @@ interface State {
   wallDetectOpen: boolean
   setWallDetectOpen: (v: boolean) => void
   ghostBelow: boolean
+  ghostAbove: boolean
+  setGhostAbove: (v: boolean) => void
   setGhostBelow: (v: boolean) => void
   addSheetFloors: (items: { name: string; dataUrl: string; bg: Background; mask?: string | null }[]) => string[]
   setMask: (floorId: string, dataUrl: string | null) => void
@@ -190,6 +192,8 @@ export const useStore = create<State>((set, get) => ({
   wallDetectOpen: false,
   setWallDetectOpen: (v) => set({ wallDetectOpen: v }),
   ghostBelow: false,
+  ghostAbove: false,
+  setGhostAbove: (v) => set({ ghostAbove: v }),
   setGhostBelow: (v) => set({ ghostBelow: v }),
   activeFloorId: initial.floors[0].id,
   selection: null,

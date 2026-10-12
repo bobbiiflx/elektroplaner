@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, History, Download, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, History, Download, ArrowDownToLine, ArrowUpToLine, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
 import { exportJson, addSnapshot, listSnapshots, type Snapshot } from '../lib/storage'
 import { UNITS } from '../lib/units'
@@ -240,6 +240,10 @@ function ViewMenu() {
   const toggleDims = useStore((s) => s.toggleDims)
   const showBackground = useStore((s) => s.showBackground)
   const toggleBackground = useStore((s) => s.toggleBackground)
+  const ghostBelow = useStore((s) => s.ghostBelow)
+  const ghostAbove = useStore((s) => s.ghostAbove)
+  const setGhostBelow = useStore((s) => s.setGhostBelow)
+  const setGhostAbove = useStore((s) => s.setGhostAbove)
   const hasBackground = useStore((s) => Object.keys(s.backgrounds).some((k) => !k.includes('~')))
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
@@ -280,6 +284,14 @@ function ViewMenu() {
                 title={hasBackground ? 'Importierten PDF-/Bild-Grundriss im Plan ein-/ausblenden' : 'Noch kein Grundriss importiert'}
               >
                 <ImageIcon size={16} /> Grundriss
+              </button>
+            </div>
+            <div className="toggle-row">
+              <button className={'toggle-btn' + (ghostBelow ? ' on' : '')} aria-pressed={ghostBelow} onClick={() => setGhostBelow(!ghostBelow)} title="Wände des Geschosses darunter als Hilfslinien (violett)">
+                <ArrowDownToLine size={16} /> Geschoss unten
+              </button>
+              <button className={'toggle-btn' + (ghostAbove ? ' on' : '')} aria-pressed={ghostAbove} onClick={() => setGhostAbove(!ghostAbove)} title="Wände des Geschosses darüber als Hilfslinien (türkis)">
+                <ArrowUpToLine size={16} /> Geschoss oben
               </button>
             </div>
             <ColorByControl />

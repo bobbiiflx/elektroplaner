@@ -70,6 +70,7 @@ export default function Editor2D() {
   const project = useStore((s) => s.project)
   const backgrounds = useStore((s) => s.backgrounds)
   const ghostBelow = useStore((s) => s.ghostBelow)
+  const ghostAbove = useStore((s) => s.ghostAbove)
   const suggest = useStore((s) => s.suggest)
   const dropSuggestion = useStore((s) => s.dropSuggestion)
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
@@ -912,26 +913,29 @@ export default function Editor2D() {
           {g * s >= 7 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMinor)" style={{ pointerEvents: 'none' }} />}
           {1000 * s >= 12 && <rect x={vis.x0} y={vis.y0} width={vis.w} height={vis.h} fill="url(#gridMajor)" style={{ pointerEvents: 'none' }} />}
 
-          {/* Geschoss darunter als Schatten (Stapelkontrolle) */}
-          {ghostBelow &&
-            (() => {
-              const idx = project.floors.findIndex((f) => f.id === floor.id)
-              const below = idx > 0 ? project.floors[idx - 1] : null
-              if (!below) return null
-              return (
-                <g style={{ pointerEvents: 'none' }} opacity={0.5}>
-                  {below.walls.map((w) => (
-                    <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="#af52de" strokeWidth={Math.max(30, w.thickness * 0.4)} strokeDasharray={`${px(8)} ${px(5)}`} />
-                  ))}
-                  {below.devices
-                    .filter((d) => d.typeId === 'steig')
-                    .map((d) => {
-                      const q = planPoint(below, d)
-                      return q ? <circle key={d.id} cx={q.x} cy={q.y} r={140} fill="none" stroke="#af52de" strokeWidth={px(2)} /> : null
-                    })}
-                </g>
-              )
-            })()}
+          {/* Nachbargeschosse als Hilfslinien (Stapelkontrolle) */}
+          {([
+            { on: ghostBelow, d: -1, color: '#af52de' },
+            { on: ghostAbove, d: 1, color: '#30b0c7' },
+          ] as const).map(({ on, d, color }) => {
+            if (!on) return null
+            const idx = project.floors.findIndex((f) => f.id === floor.id)
+            const nb = project.floors[idx + d]
+            if (!nb) return null
+            return (
+              <g key={d} style={{ pointerEvents: 'none' }} opacity={0.5}>
+                {nb.walls.map((w) => (
+                  <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke={color} strokeWidth={Math.max(30, w.thickness * 0.4)} strokeDasharray={`${px(8)} ${px(5)}`} />
+                ))}
+                {nb.devices
+                  .filter((dv) => dv.typeId === 'steig')
+                  .map((dv) => {
+                    const q = planPoint(nb, dv)
+                    return q ? <circle key={dv.id} cx={q.x} cy={q.y} r={140} fill="none" stroke={color} strokeWidth={px(2)} /> : null
+                  })}
+              </g>
+            )
+          })}
 
           {floor.anchor && (
             <g style={{ pointerEvents: 'none' }} stroke="#ff2d55" strokeWidth={px(2)}>

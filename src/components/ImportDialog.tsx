@@ -61,7 +61,7 @@ function ImportInner({ file }: { file: File }) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [singleImg])
 
   // PDF: Seiten als Vorschau rendern
   useEffect(() => {

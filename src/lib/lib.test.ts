@@ -361,3 +361,24 @@ describe('Blatt mit mehreren Geschossen', () => {
     expect(riserChecks(p).length).toBe(0)
   })
 })
+
+import { detectWallsRGBA } from './detectWalls'
+describe('detectWalls Farbe', () => {
+  it('schraffiert + rot umrandet = Wand, gelb = ignoriert', () => {
+    const W = 800, H = 500, mm = 10
+    const d = new Uint8ClampedArray(W * H * 4).fill(255)
+    const px = (x: number, y: number, c: [number, number, number]) => { const i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2] }
+    const fill = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) px(x, y, c) }
+    const outline = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (x < x0 + 2 || x >= x1 - 2 || y < y0 + 2 || y >= y1 - 2) px(x, y, c) }
+    fill(50, 50, 750, 70, [0, 0, 0]) // schwarz
+    for (let y = 430; y < 450; y++) for (let x = 50; x < 750; x++) if ((x + y) % 8 < 2) px(x, y, [0, 0, 0]) // schraffiert
+    outline(50, 70, 70, 430, [220, 0, 0]) // rot umrandet, innen weiß
+    fill(730, 70, 750, 430, [255, 230, 0]) // gelb (alte Wand)
+    outline(730, 70, 750, 430, [0, 0, 0])
+    const walls = detectWallsRGBA(d, W, H, mm)
+    const hs = walls.filter((w) => w.a.y === w.b.y), vs = walls.filter((w) => w.a.x === w.b.x)
+    expect(hs.length).toBe(2)
+    expect(vs.length).toBe(1)
+    expect(vs[0].a.x).toBeLessThan(1000)
+  })
+})

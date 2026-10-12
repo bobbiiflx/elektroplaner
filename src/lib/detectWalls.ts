@@ -50,24 +50,21 @@ function integral(m: Uint8Array, w: number, h: number): Int32Array {
 function boxSum(I: Int32Array, w: number, x0: number, y0: number, x1: number, y1: number) {
   return I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]
 }
-function erode(m: Uint8Array, w: number, h: number, s: number): Uint8Array {
-  const I = integral(m, w, h)
-  const out = new Uint8Array(w * h)
-  for (let y = 0; y + s <= h; y++)
-    for (let x = 0; x + s <= w; x++) if (boxSum(I, w, x, y, x + s, y + s) === s * s) out[y * w + x] = 1
-  return out
-}
-function dilate(m: Uint8Array, w: number, h: number, s: number): Uint8Array {
-  // Gegenstück zu erode: Fenster mit Ursprung links oben wird zurück ausgebreitet
+function boxOp(m: Uint8Array, w: number, h: number, r: number, all: boolean): Uint8Array {
   const I = integral(m, w, h)
   const out = new Uint8Array(w * h)
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const x0 = Math.max(0, x - s + 1), y0 = Math.max(0, y - s + 1)
-      if (boxSum(I, w, x0, y0, x + 1, y + 1) > 0) out[y * w + x] = 1
+      const x0 = Math.max(0, x - r), y0 = Math.max(0, y - r), x1 = Math.min(w, x + r + 1), y1 = Math.min(h, y + r + 1)
+      const sum = boxSum(I, w, x0, y0, x1, y1)
+      out[y * w + x] = all ? (sum === (x1 - x0) * (y1 - y0) ? 1 : 0) : sum > 0 ? 1 : 0
     }
   return out
 }
+const erodeSym = (m: Uint8Array, w: number, h: number, r: number) => boxOp(m, w, h, r, true)
+const dilateSym = (m: Uint8Array, w: number, h: number, r: number) => boxOp(m, w, h, r, false)
+const openSym = (m: Uint8Array, w: number, h: number, r: number) => dilateSym(erodeSym(m, w, h, r), w, h, r)
+const closeSym = (m: Uint8Array, w: number, h: number, r: number) => erodeSym(dilateSym(m, w, h, r), w, h, r)
 
 interface Band { horiz: boolean; c: number; p0: number; p1: number; t: number }
 
@@ -118,7 +115,34 @@ function bands(mask: Uint8Array, w: number, h: number, horiz: boolean, maxT: num
   return res
 }
 
+/** Pixelklassen: 1 = dunkle Tinte (schwarz/grau), 2 = rot, 3 = gelb, 0 = sonst. */
+export function classifyRGBA(d: ArrayLike<number>, n: number): Uint8Array {
+  const cls = new Uint8Array(n)
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2]
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+    const lum = r * 0.299 + g * 0.587 + b * 0.114
+    if (r > 100 && r > 1.6 * g && r > 1.6 * b) cls[i] = 2
+    else if (r > 190 && g > 170 && b < 150 && r - b > 70) cls[i] = 3
+    else if (lum < 110 && mx - mn < 70) cls[i] = 1
+  }
+  return cls
+}
+
+/** Graustufen-Variante (nur schwarze Wände). */
 export function detectWalls(gray: Uint8Array, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
+  const thr = otsu(gray)
+  const cls = new Uint8Array(gray.length)
+  for (let i = 0; i < gray.length; i++) if (gray[i] <= thr) cls[i] = 1
+  return detectWallsCls(cls, width, height, mmPerPx, opts)
+}
+
+/** Farbige Pläne: schwarz/schraffiert und rot umrandete Flächen = Wände, gelbe Flächen = alte Wände (ignoriert). */
+export function detectWallsRGBA(rgba: ArrayLike<number>, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
+  return detectWallsCls(classifyRGBA(rgba, width * height), width, height, mmPerPx, opts)
+}
+
+export function detectWallsCls(cls: Uint8Array, width: number, height: number, mmPerPx: number, opts: DetectOpts = {}): DetectedWall[] {
   const minT = opts.minThickness ?? 80
   const maxT = opts.maxThickness ?? 500
   const minL = opts.minLength ?? 500
@@ -129,17 +153,70 @@ export function detectWalls(gray: Uint8Array, width: number, height: number, mmP
   const w = Math.floor(width / k), h = Math.floor(height / k)
   if (w < 4 || h < 4) return []
 
-  const thr = otsu(gray)
-  const dark = new Uint8Array(w * h)
+  const solid = new Uint8Array(w * h), ink = new Uint8Array(w * h), red = new Uint8Array(w * h), yel = new Uint8Array(w * h)
+  const area = k * k
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      let c = 0
-      for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) if (gray[(y * k + dy) * width + x * k + dx] <= thr) c++
-      if (c * 2 > k * k) dark[y * w + x] = 1
+      let c1 = 0, c2 = 0, c3 = 0
+      for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) {
+        const v = cls[(y * k + dy) * width + x * k + dx]
+        if (v === 1) c1++
+        else if (v === 2) c2++
+        else if (v === 3) c3++
+      }
+      const i = y * w + x
+      if (c1 * 2 > area) solid[i] = 1
+      if (c1 >= area * 0.15) ink[i] = 1 // auch Schraffur
+      if (c2 >= area * 0.08) red[i] = 1
+      if (c3 * 4 > area) yel[i] = 1
     }
 
-  const s = Math.max(2, Math.round(minT / cmm))
-  const M = dilate(erode(dark, w, h, s), w, h, s)
+  const rOpen = Math.max(1, Math.floor(minT / cmm / 2))
+  const rClose = Math.max(2, Math.round(125 / cmm))
+  // schwarze / schraffierte Wände: Schraffur schließen, dünne Linien öffnen, gelbe Flächen ausnehmen
+  const hatched = closeSym(ink, w, h, rClose)
+  for (let i = 0; i < hatched.length; i++) if (solid[i]) hatched[i] = 1
+  const yellowFill = closeSym(yel, w, h, rClose)
+  for (let i = 0; i < hatched.length; i++) if (yellowFill[i] && !solid[i]) hatched[i] = 0
+  const dark = openSym(hatched, w, h, rOpen)
+
+  // rot umrandete Flächen: Konturen schließen, umschlossene dünne Flächen = Wand
+  const redC = closeSym(red, w, h, 1)
+  let M = dark
+  if (redC.some((v) => v)) {
+    const comp = new Int32Array(w * h).fill(-1)
+    const compNotRed = new Uint8Array(w * h)
+    for (let i = 0; i < compNotRed.length; i++) compNotRed[i] = redC[i] ? 0 : 1
+    const core = erodeSym(compNotRed, w, h, Math.max(2, Math.ceil(maxT / cmm / 2)))
+    const bad: boolean[] = []
+    const stack: number[] = []
+    let n = 0
+    for (let s0 = 0; s0 < w * h; s0++) {
+      if (!compNotRed[s0] || comp[s0] >= 0) continue
+      let isBad = false
+      let cnt = 0
+      stack.push(s0)
+      comp[s0] = n
+      while (stack.length) {
+        const p = stack.pop()!
+        cnt++
+        const x = p % w, y = (p / w) | 0
+        if (core[p] || x === 0 || y === 0 || x === w - 1 || y === h - 1) isBad = true
+        if (x > 0 && compNotRed[p - 1] && comp[p - 1] < 0) { comp[p - 1] = n; stack.push(p - 1) }
+        if (x < w - 1 && compNotRed[p + 1] && comp[p + 1] < 0) { comp[p + 1] = n; stack.push(p + 1) }
+        if (y > 0 && compNotRed[p - w] && comp[p - w] < 0) { comp[p - w] = n; stack.push(p - w) }
+        if (y < h - 1 && compNotRed[p + w] && comp[p + w] < 0) { comp[p + w] = n; stack.push(p + w) }
+      }
+      bad[n] = isBad || cnt < 4
+      n++
+    }
+    const redWalls = new Uint8Array(w * h)
+    for (let i = 0; i < redWalls.length; i++) if (redC[i] || (comp[i] >= 0 && !bad[comp[i]])) redWalls[i] = 1
+    const redOpen = openSym(redWalls, w, h, rOpen)
+    M = new Uint8Array(dark)
+    for (let i = 0; i < M.length; i++) if (redOpen[i]) M[i] = 1
+  }
+
   const minRun = Math.max(3, Math.round(minL / cmm))
   const maxTc = Math.round(maxT / cmm)
   const hb = bands(runMask(M, w, h, minRun, true), w, h, true, maxTc)

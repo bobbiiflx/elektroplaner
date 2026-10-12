@@ -13,7 +13,7 @@ import {
 } from '../config/catalog'
 import { cableLengths, clamp, wallLength } from '../lib/geom'
 import { pickFile } from '../lib/files'
-import { detectWalls } from '../lib/detectWalls'
+import { detectWallsRGBA } from '../lib/detectWalls'
 import { alignToReference, riserChecks } from '../lib/stack'
 import { setWallLength, syncDeviceNodes } from '../lib/link'
 import { formatLen } from '../lib/units'
@@ -542,9 +542,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
       ctx.fillRect(0, 0, c.width, c.height)
       ctx.drawImage(img, 0, 0)
       const d = ctx.getImageData(0, 0, c.width, c.height).data
-      const gray = new Uint8Array(c.width * c.height)
-      for (let i = 0; i < gray.length; i++) gray[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0
-      const walls = detectWalls(gray, c.width, c.height, bg.mmPerPx)
+      const walls = detectWallsRGBA(d, c.width, c.height, bg.mmPerPx)
       if (!walls.length) {
         showToast('Keine Wände erkannt – Plan zu unsauber oder Maßstab prüfen')
         return
@@ -676,7 +674,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
                 Entfernen
               </button>
             </div>
-            <button className="btn block" onClick={detect} title="Erkennt waagerechte/senkrechte Wände als Vorschlag – nach dem Kalibrieren">
+            <button className="btn block" onClick={detect} title="Erkennt waagerechte/senkrechte Wände (schwarz, schraffiert, rot umrandet; gelb wird ignoriert) als Vorschlag – nach dem Kalibrieren">
               Wände erkennen
             </button>
           </>

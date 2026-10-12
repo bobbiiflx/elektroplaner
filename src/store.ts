@@ -142,10 +142,22 @@ function readTheme(): Theme {
   }
   return 'system'
 }
+// Ein umgebendes Fenster (z. B. der Artefakt-Viewer) kann selbst data-theme setzen; das merken wir uns,
+// damit „System“ dessen Wahl respektiert statt sie zu löschen.
+let hostTheme: string | null = typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null
+let own = false
+if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+  new MutationObserver(() => {
+    if (!own) hostTheme = document.documentElement.getAttribute('data-theme')
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+}
 function applyTheme(t: Theme) {
   const el = document.documentElement
-  if (t === 'system') el.removeAttribute('data-theme')
-  else el.setAttribute('data-theme', t)
+  own = true
+  const v = t === 'system' ? hostTheme : t
+  if (v) el.setAttribute('data-theme', v)
+  else el.removeAttribute('data-theme')
+  setTimeout(() => (own = false), 0)
 }
 applyTheme(readTheme())
 

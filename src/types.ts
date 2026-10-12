@@ -178,6 +178,7 @@ export interface Project {
   floors: Floor[]
   circuits?: Circuit[]
   groups?: Group[]
+  prices?: Record<string, number> // eigene Einzelpreise (€) je Position, überschreiben die Richtwerte
   scenes?: Scene[]
 }
 

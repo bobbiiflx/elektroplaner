@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { AlertTriangle, ClipboardCopy, Download } from 'lucide-react'
 import { DIM_LABEL, deviceType } from '../config/catalog'
 import { downloadText } from '../lib/files'
@@ -7,8 +7,10 @@ import { actuatorChannels, actuatorNeeds, circuitRows, toCsv, wayRows } from '..
 import { formatLen } from '../lib/units'
 import { useStore } from '../store'
 import { Modal, Segmented } from './ui'
+import { NumberField } from './NumberField'
+import { VAT, materialList } from '../lib/material'
 
-type Tab = 'circuits' | 'channels' | 'ga' | 'ways'
+type Tab = 'circuits' | 'channels' | 'ga' | 'ways' | 'material'
 type Cell = string | number
 interface Table {
   head: string[]
@@ -57,14 +59,17 @@ export default function SchrankDialog() {
   const unit = useStore((s) => s.unit)
   const showToast = useStore((s) => s.showToast)
   const [tab, setTab] = useState<Tab>('circuits')
+  const [matFloor, setMatFloor] = useState('')
+  const [withRuns, setWithRuns] = useState(true)
+  const edit = useStore((s) => s.edit)
   const m = (mm: number) => formatLen(mm, unit === 'mm' ? 'm' : unit === 'cm' ? 'm' : unit)
 
   const data = useMemo(() => {
     if (!open) return null
     const { rows, unassigned } = circuitRows(project)
     const channels = actuatorChannels(project)
-    return { rows, unassigned, channels, needs: actuatorNeeds(channels), ways: wayRows(project) }
-  }, [open, project])
+    return { rows, unassigned, channels, needs: actuatorNeeds(channels), ways: wayRows(project), mat: materialList(project, { floorId: matFloor || undefined, includeRuns: withRuns }) }
+  }, [open, project, matFloor, withRuns])
   if (!open || !data) return null
 
   const circuits: Table = {
@@ -99,6 +104,16 @@ export default function SchrankDialog() {
     rows: data.ways.map((w) => [w.distName, deviceType(w.device.typeId).name, w.floor.name, w.groups.join(', ') || '–', m(w.len), w.manual ? 'gesetzt' : 'geschätzt']),
     warn: data.ways.map((w) => w.warn),
   }
+  const eur = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+  const matTable: Table = {
+    head: ['Gruppe', 'Position', 'Menge', 'Einheit', 'Einzelpreis €', 'Summe €'],
+    rows: [
+      ...data.mat.lines.map((l) => [l.group, l.name, num(l.qty, l.unit === 'm' ? 1 : 0), l.unit, num(l.price, 2), num(l.sum, 2)] as Cell[]),
+      ['', 'Summe netto', '', '', '', num(data.mat.net, 2)],
+      ['', `MwSt. ${Math.round(VAT * 100)} %`, '', '', '', num(data.mat.net * VAT, 2)],
+      ['', 'Summe brutto', '', '', '', num(data.mat.net * (1 + VAT), 2)],
+    ],
+  }
   const total = data.ways.reduce((s, w) => s + w.len, 0)
 
   const current: { tables: { title: string; t: Table }[] } =
@@ -108,15 +123,17 @@ export default function SchrankDialog() {
         ? { tables: [{ title: 'Aktorbedarf je Verteiler', t: needs }, { title: 'Aktorkanäle', t: channels }] }
         : tab === 'ga'
           ? { tables: [{ title: 'Gruppenadressen', t: ga }, { title: 'Szenen', t: scenes }] }
-          : { tables: [{ title: `Leitungswege zum Verteiler (Summe ${m(total)})`, t: ways }] }
+          : tab === 'ways'
+            ? { tables: [{ title: `Leitungswege zum Verteiler (Summe ${m(total)})`, t: ways }] }
+            : { tables: [{ title: 'Material & Kosten (netto)', t: matTable }] }
 
   const csv = () => current.tables.map(({ title, t }) => toCsv([[title], t.head, ...t.rows])).join('\r\n\r\n')
-  const label = { circuits: 'stromkreise', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege' }[tab]
+  const label = { circuits: 'stromkreise', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege', material: 'material' }[tab]
   const safe = project.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '_').trim() || 'projekt'
 
   return (
     <Modal
-      title="Schaltschrank-Listen"
+      title="Listen: Schaltschrank, Material, Kosten"
       width={1100}
       onClose={() => setOpen(false)}
       footer={
@@ -152,6 +169,7 @@ export default function SchrankDialog() {
             { value: 'channels', label: 'Aktorkanäle' },
             { value: 'ga', label: 'Gruppenadressen' },
             { value: 'ways', label: 'Leitungswege' },
+            { value: 'material', label: 'Material & Kosten' },
           ]}
         />
       </div>
@@ -160,7 +178,83 @@ export default function SchrankDialog() {
           <AlertTriangle size={16} /> {data.unassigned.length} Geräte ohne Stromkreis sind in der Liste nicht enthalten (siehe „Offene Punkte“).
         </p>
       )}
-      {current.tables.map(({ title, t }) => (
+      {tab === 'material' ? (
+        <div className="schrank-table">
+          <div className="mat-opts">
+            <select value={matFloor} onChange={(e) => setMatFloor(e.target.value)}>
+              <option value="">Alle Geschosse</option>
+              {project.floors.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <label className="check">
+              <input type="checkbox" checked={withRuns} onChange={(e) => setWithRuns(e.target.checked)} /> geschätzte Zuleitungen zum Verteiler einrechnen
+            </label>
+          </div>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Position</th>
+                  <th className="r">Menge</th>
+                  <th>Einheit</th>
+                  <th className="r">Einzelpreis €</th>
+                  <th className="r">Summe €</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.mat.lines.map((l, i) => (
+                  <Fragment key={l.key}>
+                    {(i === 0 || data.mat.lines[i - 1].group !== l.group) && (
+                      <tr key={'g' + l.group} className="group-row">
+                        <td colSpan={5}>{l.group}</td>
+                      </tr>
+                    )}
+                    <tr title={l.note}>
+                      <td>{l.name}</td>
+                      <td className="r">{num(l.qty, l.unit === 'm' ? 1 : 0)}</td>
+                      <td>{l.unit}</td>
+                      <td className="r price-cell">
+                        <NumberField
+                          value={l.price}
+                          decimals={2}
+                          min={0}
+                          suffix={l.price !== l.defaultPrice ? '✎' : undefined}
+                          onCommit={(v) => edit((p) => void ((p.prices = p.prices ?? {})[l.key] = v), `price:${l.key}`)}
+                        />
+                      </td>
+                      <td className="r">{num(l.sum, 2)}</td>
+                    </tr>
+                  </Fragment>
+                ))}
+                {data.mat.lines.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      Noch keine Positionen.
+                    </td>
+                  </tr>
+                )}
+                <tr className="sum-row">
+                  <td colSpan={4}>Summe netto</td>
+                  <td className="r">{eur(data.mat.net)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4}>MwSt. {Math.round(VAT * 100)} %</td>
+                  <td className="r">{eur(data.mat.net * VAT)}</td>
+                </tr>
+                <tr className="sum-row">
+                  <td colSpan={4}>Summe brutto</td>
+                  <td className="r">{eur(data.mat.net * (1 + VAT))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="muted small">Preise sind Richtwerte und lassen sich je Position anpassen (✎ = eigener Preis). Die Mengen aus Zuleitungen sind geschätzt.</p>
+        </div>
+      ) : null}
+      {tab !== 'material' && current.tables.map(({ title, t }) => (
         <div key={title} className="schrank-table">
           <h3>{title}</h3>
           <DataTable t={t} />

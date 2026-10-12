@@ -93,6 +93,8 @@ body,
 }
 body {
   overscroll-behavior: none;
+  color: var(--ink);
+  font: inherit;
 }
 button,
 input,
@@ -1168,7 +1170,7 @@ p {
 .schrank-tabs{margin-bottom:12px}
 .schrank-table{margin-top:14px}
 .schrank-table h3{margin:0 0 6px;font-size:13px;letter-spacing:.02em}
-.table-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:46vh}
+.table-scroll{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:56vh}
 .data-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
 .data-table th{position:sticky;top:0;background:var(--paper);text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink-soft)}
 .data-table td{padding:6px 10px;border-top:1px solid var(--line);vertical-align:top}
@@ -1177,3 +1179,9 @@ p {
 .menu .seg button.on{background:var(--accent);color:#fff;box-shadow:none}
 .view-menu{min-width:340px}
 .menu-block .seg button{white-space:nowrap;padding:5px 8px}
+#root{color:var(--ink)}
+.data-table .r{text-align:right}
+.data-table .group-row td{background:var(--field);font-weight:600;font-size:12px;letter-spacing:.02em}
+.data-table .sum-row td{font-weight:700;border-top:2px solid var(--line)}
+.price-cell .field-num{max-width:110px;margin-left:auto}
+.mat-opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px}

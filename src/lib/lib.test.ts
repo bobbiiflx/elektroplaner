@@ -268,3 +268,18 @@ describe('Schaltschrank-Listen', () => {
     expect(toCsv([['a;b', 'c"d', 1]])).toBe('"a;b";"c""d";1')
   })
 })
+
+import { materialList } from './material'
+describe('Material', () => {
+  it('summiert Geräte, Dosen und Leitungen; eigener Preis überschreibt', () => {
+    const p = sampleProject()
+    const base = materialList(p, { includeRuns: false })
+    expect(base.lines.some((l) => l.key.startsWith('dev:'))).toBe(true)
+    expect(base.lines.some((l) => l.key.startsWith('cab:') && l.unit === 'm' && l.qty > 4)).toBe(true)
+    const key = base.lines[0].key
+    p.prices = { [key]: 1000 }
+    const l = materialList(p, { includeRuns: false }).lines.find((x) => x.key === key)!
+    expect(l.price).toBe(1000)
+    expect(l.sum).toBe(1000 * l.qty)
+  })
+})

@@ -250,7 +250,7 @@ function OutputMenu() {
               setSchrankOpen(true)
             }}
           >
-            <Table2 size={15} /> Schaltschrank-Listen
+            <Table2 size={15} /> Listen (Schaltschrank, Material, Kosten)
           </button>
         </div>
       )}

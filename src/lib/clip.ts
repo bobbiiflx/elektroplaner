@@ -1,9 +1,9 @@
-import type { Cable, Device, Dormer, Floor, Loggia, Opening, RoofPlane, Vec2, Wall } from '../types'
+import type { Cable, Device, Dormer, Floor, Loggia, Opening, RoofPlane, Skylight, Vec2, Wall } from '../types'
 import { rectCorners } from './roof'
 import { planPoint } from './runs'
 import { uid } from './geom'
 
-export type SelKind = 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia'
+export type SelKind = 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'
 export interface Sel {
   kind: SelKind
   id: string
@@ -17,6 +17,7 @@ export interface Clip {
   roofs: RoofPlane[]
   dormers: Dormer[]
   loggias: Loggia[]
+  skylights: Skylight[]
   from?: string // Quell-Geschoss
 }
 
@@ -44,6 +45,7 @@ export function selectInRect(floor: Floor, r: Rect): Sel[] {
   for (const x of floor.roofs ?? []) if (inside(r, x.a) && inside(r, x.b)) out.push({ kind: 'roof', id: x.id })
   for (const x of floor.dormers ?? []) if (rectCorners(x).every((q) => inside(r, q))) out.push({ kind: 'dormer', id: x.id })
   for (const x of floor.loggias ?? []) if (rectCorners(x).every((q) => inside(r, q))) out.push({ kind: 'loggia', id: x.id })
+  for (const x of floor.skylights ?? []) if (inside(r, x.c)) out.push({ kind: 'skylight', id: x.id })
   return out
 }
 
@@ -63,10 +65,11 @@ export function collectClip(floor: Floor, sels: Sel[]): Clip {
     roofs: (floor.roofs ?? []).filter((x) => has('roof', x.id)),
     dormers: (floor.dormers ?? []).filter((x) => has('dormer', x.id)),
     loggias: (floor.loggias ?? []).filter((x) => has('loggia', x.id)),
+    skylights: (floor.skylights ?? []).filter((x) => has('skylight', x.id)),
   })
 }
 
-export const clipSize = (c: Clip) => c.walls.length + c.devices.length + c.cables.length + c.roofs.length + c.dormers.length + c.loggias.length + c.openings.filter((o) => !c.walls.some((w) => w.id === o.wallId)).length
+export const clipSize = (c: Clip) => c.walls.length + c.devices.length + c.cables.length + c.roofs.length + c.dormers.length + c.loggias.length + c.skylights.length + c.openings.filter((o) => !c.walls.some((w) => w.id === o.wallId)).length
 
 /**
  * Fügt die Zwischenablage in ein Geschoss ein (neue IDs). `offset` verschiebt alles im Plan.
@@ -127,8 +130,10 @@ export function pasteClip(floor: Floor, clip: Clip, offset: Vec2, sameFloor: boo
     floor.cables.push(cb)
     out.push({ kind: 'cable', id: cb.id })
   }
+  const rmap = new Map<string, string>()
   for (const r of c.roofs) {
-    r.id = uid('r')
+    rmap.set(r.id, uid('r'))
+    r.id = rmap.get(r.id)!
     mv(r.a)
     mv(r.b)
     ;(floor.roofs ??= []).push(r)
@@ -140,6 +145,15 @@ export function pasteClip(floor: Floor, clip: Clip, offset: Vec2, sameFloor: boo
     mv(r.b)
     ;(floor.dormers ??= []).push(r)
     out.push({ kind: 'dormer', id: r.id })
+  }
+  for (const k of c.skylights ?? []) {
+    const nr = rmap.get(k.roofId) ?? (sameFloor && floor.roofs?.some((x) => x.id === k.roofId) ? k.roofId : null)
+    if (!nr) continue
+    k.id = uid('s')
+    k.roofId = nr
+    mv(k.c)
+    ;(floor.skylights ??= []).push(k)
+    out.push({ kind: 'skylight', id: k.id })
   }
   for (const r of c.loggias) {
     r.id = uid('l')
@@ -156,7 +170,7 @@ export function pasteClip(floor: Floor, clip: Clip, offset: Vec2, sameFloor: boo
 /** Löscht die gewählten Elemente samt abhängiger Öffnungen/Geräte. */
 export function deleteSels(floor: Floor, sels: Sel[]) {
   const ids = (k: SelKind) => new Set(sels.filter((s) => s.kind === k).map((s) => s.id))
-  const w = ids('wall'), o = ids('opening'), d = ids('device'), c = ids('cable'), r = ids('roof'), g = ids('dormer'), l = ids('loggia'), m = ids('dim')
+  const w = ids('wall'), o = ids('opening'), d = ids('device'), c = ids('cable'), r = ids('roof'), g = ids('dormer'), l = ids('loggia'), m = ids('dim'), k = ids('skylight')
   const goneDev = new Set(floor.devices.filter((x) => d.has(x.id) || w.has(x.wallId)).map((x) => x.id))
   floor.walls = floor.walls.filter((x) => !w.has(x.id))
   floor.openings = floor.openings.filter((x) => !o.has(x.id) && !w.has(x.wallId))
@@ -167,4 +181,5 @@ export function deleteSels(floor: Floor, sels: Sel[]) {
   floor.dormers = (floor.dormers ?? []).filter((x) => !g.has(x.id))
   floor.loggias = (floor.loggias ?? []).filter((x) => !l.has(x.id))
   floor.dims = (floor.dims ?? []).filter((x) => !m.has(x.id))
+  floor.skylights = (floor.skylights ?? []).filter((x) => !k.has(x.id) && (floor.roofs ?? []).some((rr) => rr.id === x.roofId))
 }

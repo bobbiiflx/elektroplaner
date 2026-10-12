@@ -1,4 +1,4 @@
-import type { Floor, OrientedRect, RoofPlane, Vec2, Wall } from '../types'
+import type { Floor, OrientedRect, RoofPlane, Skylight, Vec2, Wall } from '../types'
 import { wallLength } from './geom'
 
 const rad = (d: number) => (d * Math.PI) / 180
@@ -33,8 +33,20 @@ export function roofHeightAt(floor: Floor, p: Vec2, cap = floor.wallHeight): num
     if (v !== null && v < h) h = v
   }
   // Gauben heben die Schräge im Rechteck auf ihre lichte Höhe an
-  for (const d of floor.dormers ?? []) if (inRect(d, p, TOL) && d.height > h) h = Math.min(cap, d.height)
+  for (const d of floor.dormers ?? []) if (inRect(d, p, TOL)) {
+    const v = dormerHeightAt(d, p)
+    if (v > h) h = Math.min(cap, v)
+  }
   return Math.max(0, h)
+}
+
+/** Höhe der Gaubendecke an Punkt p: Flachdachgaube = konstant, Schleppgaube fällt von der Front nach hinten. */
+export function dormerHeightAt(d: { a: Vec2; b: Vec2; side: 1 | -1; height: number; slope?: number }, p: Vec2): number {
+  if (!d.slope) return d.height
+  const L = Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y) || 1
+  const nx = (-(d.b.y - d.a.y) / L) * d.side, ny = ((d.b.x - d.a.x) / L) * d.side
+  const t = Math.max(0, (p.x - d.a.x) * nx + (p.y - d.a.y) * ny)
+  return d.height - Math.tan(rad(d.slope)) * t
 }
 
 // --- Rechtecke (Gaube, Loggia) -------------------------------------------
@@ -152,4 +164,31 @@ export function loggiaNotes(floor: Floor): LoggiaNote[] {
     if (p && floor.loggias.some((l) => inRect(l, p!, 150))) out.push({ id: d.id, text: 'in der Loggia: Außenbereich – spritzwassergeschützt (mind. IP44), Stromkreis mit RCD 30 mA' })
   }
   return out
+}
+
+// --- Dachflächenfenster -------------------------------------------------------
+/** Eckpunkte im Grundriss (Traufseite a, b; Firstseite c, d) und Höhen über OKFF auf der Dachebene. */
+export function skylightGeometry(floor: Floor, s: Skylight): { pts: Vec2[]; hs: number[] } | null {
+  const r = (floor.roofs ?? []).find((x) => x.id === s.roofId)
+  if (!r) return null
+  const { u, n } = roofAxes(r)
+  const dep = (s.h * Math.cos(rad(r.angle))) / 2
+  const hw = s.w / 2
+  const P = (du: number, dn: number): Vec2 => ({ x: s.c.x + u.x * du + n.x * dn, y: s.c.y + u.y * du + n.y * dn })
+  const pts = [P(-hw, -dep), P(hw, -dep), P(hw, dep), P(-hw, dep)]
+  const hs = pts.map((p) => planeHeightAt(r, p) ?? r.knee)
+  return { pts, hs }
+}
+/** Dachebene unter Punkt p (niedrigste, auf der p im Anstieg liegt). */
+export function roofPlaneAt(floor: Floor, p: Vec2): RoofPlane | null {
+  let best: RoofPlane | null = null
+  let bh = Infinity
+  for (const r of floor.roofs ?? []) {
+    const v = planeHeightAt(r, p)
+    if (v !== null && v < bh && v < floor.wallHeight) {
+      bh = v
+      best = r
+    }
+  }
+  return best
 }

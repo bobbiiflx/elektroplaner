@@ -6,9 +6,9 @@ import { cableType, devType, isGlazed } from '../config/catalog'
 import { elevationOf } from '../lib/factory'
 import { boundsOf, cableLengths, pointOnWall, wallAngleDeg, wallDir, wallLength, wallNormal } from '../lib/geom'
 import { horizontalBands, verticalSpans } from '../lib/zones'
-import { minProfile, rectAxes, roofAxes, wallProfile } from '../lib/roof'
+import { dormerHeightAt, minProfile, rectAxes, roofAxes, skylightGeometry, wallProfile } from '../lib/roof'
 import { useStore } from '../store'
-import type { Cable, Device, Floor, Opening, OrientedRect, Project, RoofPlane, Wall } from '../types'
+import type { Cable, Device, Dormer, Floor, Opening, OrientedRect, Project, RoofPlane, Skylight, Wall } from '../types'
 
 const ACCENT = '#0071e3'
 const mm = (v: number) => v / 1000
@@ -148,6 +148,51 @@ function RectMesh({ rect, height, color, opacity }: { rect: OrientedRect; height
     <mesh position={[mm(cx), mm(height / 2), mm(cy)]} rotation={[0, rotY, 0]} raycast={() => null}>
       <boxGeometry args={[mm(L), mm(height), mm(rect.depth)]} />
       <meshStandardMaterial color={color} transparent opacity={opacity} depthWrite={false} />
+    </mesh>
+  )
+}
+
+/** Gaube als Volumen; Schleppgaube mit fallender Decke */
+function DormerMesh({ dormer, opacity }: { dormer: Dormer; opacity: number }) {
+  const geo = useMemo(() => {
+    const { n } = rectAxes(dormer)
+    const c = [dormer.a, dormer.b, { x: dormer.b.x + n.x * dormer.depth, y: dormer.b.y + n.y * dormer.depth }, { x: dormer.a.x + n.x * dormer.depth, y: dormer.a.y + n.y * dormer.depth }]
+    const hf = dormer.height
+    const hb = Math.max(0, dormerHeightAt(dormer, c[2]))
+    const hs = [hf, hf, hb, hb]
+    const v: number[] = []
+    for (let i = 0; i < 4; i++) v.push(mm(c[i].x), 0, mm(c[i].y))
+    for (let i = 0; i < 4; i++) v.push(mm(c[i].x), mm(hs[i]), mm(c[i].y))
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+    g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7])
+    g.computeVertexNormals()
+    return g
+  }, [dormer])
+  return (
+    <mesh geometry={geo} raycast={() => null}>
+      <meshStandardMaterial color="#ff9f0a" transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
+  )
+}
+
+/** Dachflächenfenster als Glasfläche in der Dachebene */
+function SkylightMesh({ floor, sky, opacity }: { floor: Floor; sky: Skylight; opacity: number }) {
+  const geo = useMemo(() => {
+    const g0 = skylightGeometry(floor, sky)
+    if (!g0) return null
+    const v: number[] = []
+    g0.pts.forEach((p, i) => v.push(mm(p.x), mm(g0.hs[i]) + 0.004, mm(p.y)))
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+    g.setIndex([0, 1, 2, 0, 2, 3])
+    g.computeVertexNormals()
+    return g
+  }, [floor, sky])
+  if (!geo) return null
+  return (
+    <mesh geometry={geo} raycast={() => null}>
+      <meshStandardMaterial color="#5aa9ff" transparent opacity={0.7 * opacity} side={THREE.DoubleSide} depthWrite={false} />
     </mesh>
   )
 }
@@ -378,7 +423,10 @@ function FloorModel({
           <RoofMesh key={r.id} roof={r} cap={floor.wallHeight} opacity={active ? 1 : 0.4} />
         ))}
         {(floor.dormers ?? []).map((d) => (
-          <RectMesh key={d.id} rect={d} height={d.height} color="#ff9f0a" opacity={0.16 * (active ? 1 : 0.4)} />
+          <DormerMesh key={d.id} dormer={d} opacity={0.16 * (active ? 1 : 0.4)} />
+        ))}
+        {(floor.skylights ?? []).map((sk) => (
+          <SkylightMesh key={sk.id} floor={floor} sky={sk} opacity={active ? 1 : 0.4} />
         ))}
         {(floor.loggias ?? []).map((l) => (
           <RectMesh key={l.id} rect={l} height={40} color="#0a84ff" opacity={0.4 * (active ? 1 : 0.4)} />

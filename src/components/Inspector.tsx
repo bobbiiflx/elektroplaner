@@ -25,7 +25,7 @@ import { Row, Section, Segmented } from './ui'
 import { OPENING_TYPES, openingDef } from '../config/catalog'
 import { planChecks } from '../lib/checks'
 import { loggiaNotes, rectArea, rectWidth, roofContour, roofIssues } from '../lib/roof'
-import type { Dormer, Loggia, RoofPlane } from '../types'
+import type { Dormer, Loggia, RoofPlane, Skylight } from '../types'
 import { OpeningIcon } from './OpeningGlyphs'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
@@ -112,6 +112,9 @@ export default function Inspector() {
   } else if (selection?.kind === 'loggia') {
     const l = (floor.loggias ?? []).find((x) => x.id === selection.id)
     body = l ? <LoggiaPanel loggia={l} /> : null
+  } else if (selection?.kind === 'skylight') {
+    const k = (floor.skylights ?? []).find((x) => x.id === selection.id)
+    body = k ? <SkylightPanel sky={k} /> : null
   } else if (selection?.kind === 'dim') {
     const m = (floor.dims ?? []).find((x) => x.id === selection.id)
     body = m ? <DimPanel dim={m} /> : null
@@ -126,7 +129,7 @@ export default function Inspector() {
     )
   if (!body) return <FloorPanel floor={floor} />
 
-  const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia'
+  const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia' || selection?.kind === 'skylight'
   return (
     <div className="inspector-body">
       <InspectorTabs />
@@ -464,7 +467,43 @@ function DormerPanel({ dormer, floor }: { dormer: Dormer; floor: Floor }) {
           Seite wechseln
         </button>
       </Row>
+      <Row label="Form" hint="Gaubendecke">
+        <Segmented
+          value={dormer.slope ? 'shed' : 'flat'}
+          onChange={(v) => upd((d) => void (d.slope = v === 'shed' ? 12 : undefined), key('form'))}
+          options={[
+            { value: 'flat', label: 'Flachdach' },
+            { value: 'shed', label: 'Schlepp' },
+          ]}
+        />
+      </Row>
+      {dormer.slope ? (
+        <Row label="Neigung" hint="fällt nach hinten">
+          <NumberField value={dormer.slope} decimals={1} suffix="°" min={3} max={45} onCommit={(v) => upd((d) => void (d.slope = v), key('sl'))} />
+        </Row>
+      ) : null}
       <p className="muted small">Im Rechteck wird die Dachschräge bis zur lichten Höhe angehoben. Die Wände der Gaube (Front, Wangen) zeichnest du wie normale Wände auf den Rand; Fenster setzt du in die Frontwand. Maximal bis zur Firsthöhe des Geschosses ({formatLen(floor.wallHeight, unit)}).</p>
+    </Section>
+  )
+}
+
+function SkylightPanel({ sky }: { sky: Skylight }) {
+  const editFloor = useEditFloor()
+  const upd = (fn: (k: Skylight) => void, key?: string) =>
+    editFloor((f) => {
+      const k = (f.skylights ?? []).find((x) => x.id === sky.id)
+      if (k) fn(k)
+    }, key)
+  const key = (k: string) => `${k}:${sky.id}`
+  return (
+    <Section title="Dachflächenfenster">
+      <Row label="Breite" hint="entlang Traufe">
+        <LenField mm={sky.w} min={300} max={3000} onCommit={(v) => upd((k) => void (k.w = v), key('w'))} />
+      </Row>
+      <Row label="Höhe" hint="entlang Schräge">
+        <LenField mm={sky.h} min={300} max={3000} onCommit={(v) => upd((k) => void (k.h = v), key('h'))} />
+      </Row>
+      <p className="muted small">Im Plan ziehen verschiebt das Fenster innerhalb der Dachschräge. Übliche Größen: 78 × 118 cm, 94 × 118 cm, 114 × 118 cm.</p>
     </Section>
   )
 }
@@ -736,6 +775,17 @@ function BuildSections({ floor }: { floor: Floor }) {
           Gaube zeichnen
         </button>
       </Section>
+      <Section title="Dachflächenfenster">
+        {(floor.skylights ?? []).length === 0 && <p className="muted small">Fenster in der Dachschräge: in die Schräge klicken – Größe und Lage lassen sich danach anpassen.</p>}
+        {(floor.skylights ?? []).map((k, i) => (
+          <button key={k.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'skylight', id: k.id })}>
+            Dachfenster {i + 1} · {Math.round(k.w / 10)} × {Math.round(k.h / 10)} cm
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('skylight')} disabled={(floor.roofs ?? []).length === 0}>
+          Dachflächenfenster setzen
+        </button>
+      </Section>
       <Section title="Loggia / Balkon">
         {(floor.loggias ?? []).length === 0 && <p className="muted small">Offene Seite und Tiefe aufziehen – die Brüstung wird ergänzt, Geräte dort werden als Außenbereich geprüft.</p>}
         {(floor.loggias ?? []).map((l, i) => (
@@ -790,7 +840,7 @@ function InspectorTabs() {
     useStore.getState().setPickerOpen(false)
     // Bau-Werkzeug beenden, wenn man zu den Elektro-Tabs wechselt
     const st = useStore.getState()
-    if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia'].includes(st.tool)) st.setTool('select')
+    if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia', 'skylight'].includes(st.tool)) st.setTool('select')
     setTab(t)
   }
   return (

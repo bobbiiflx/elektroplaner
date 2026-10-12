@@ -1,5 +1,6 @@
 import { planPoint } from '../lib/runs'
 import { selectInRect } from '../lib/clip'
+import { roofPlaneAt, skylightGeometry } from '../lib/roof'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { findGap, type WallGap } from '../lib/gaps'
@@ -39,6 +40,7 @@ type Drag =
   | { kind: 'wallEnd'; id: string; end: 'a' | 'b'; joined: WallEnd[] }
   | { kind: 'cableNode'; id: string; idx: number }
   | { kind: 'marquee'; start: Vec2 }
+  | { kind: 'sky'; id: string; start: Vec2; c0: Vec2 }
   | { kind: 'shape'; what: ShapeKind; id: string; start: Vec2; a0: Vec2; b0: Vec2 }
   | { kind: 'shapePt'; what: ShapeKind; id: string; pt: 'a' | 'b' | 'depth' }
 
@@ -63,6 +65,7 @@ const HINTS: Record<string, string> = {
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
   roof: 'Dachschräge: 1. und 2. Klick = Linie, an der die Schräge beginnt (Kniestock/Traufe) · 3. Klick = Seite, zu der sie ansteigt (in den Raum)',
   dormer: 'Gaube: 1. und 2. Klick = Gaubenfront (Außenkante) · 3. Klick = Tiefe in den Raum (zieht die Rechteckfläche auf)',
+  skylight: 'Dachflächenfenster: in die Dachschräge klicken (Mitte des Fensters) · danach Größe rechts einstellen',
   loggia: 'Loggia: 1. und 2. Klick = offene Seite (Brüstung) · 3. Klick = Tiefe in den Raum',
   anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
 }
@@ -625,6 +628,22 @@ export default function Editor2D() {
       case 'loggia':
         addRoofPoint(raw, orthoNow)
         break
+      case 'skylight': {
+        const r = roofPlaneAt(floor, raw)
+        if (!r) {
+          showToast('Dachflächenfenster nur innerhalb einer Dachschräge setzen.')
+          break
+        }
+        const id = uid('s_')
+        edit((p) => {
+          const f = p.floors.find((x) => x.id === floor.id)
+          if (!f) return
+          ;(f.skylights ??= []).push({ id, roofId: r.id, c: { x: Math.round(raw.x / 10) * 10, y: Math.round(raw.y / 10) * 10 }, w: 780, h: 1180 })
+        })
+        select({ kind: 'skylight', id })
+        setTool('select')
+        break
+      }
       case 'device':
         placeDevice(raw)
         break
@@ -663,6 +682,21 @@ export default function Editor2D() {
     }
     if (d.kind === 'marquee') {
       setMarquee({ a: d.start, b: raw })
+      return
+    }
+    if (d.kind === 'sky') {
+      const gr = settings.grid
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        const sk = f?.skylights?.find((x) => x.id === d.id)
+        if (!f || !sk) return
+        const c = { x: Math.round((d.c0.x + raw.x - d.start.x) / gr) * gr, y: Math.round((d.c0.y + raw.y - d.start.y) / gr) * gr }
+        const pl = roofPlaneAt(f as Floor, c)
+        if (pl) {
+          sk.c = c
+          sk.roofId = pl.id
+        }
+      }, `sky:${d.id}`)
       return
     }
     if (d.kind === 'device') {
@@ -778,7 +812,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -1030,7 +1064,7 @@ export default function Editor2D() {
                 <polygon points={pts} fill="#ff9f0a" opacity={0.14} style={{ pointerEvents: 'none' }} />
                 <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#c77c0a'} strokeWidth={px(sel ? 3 : 2)} strokeDasharray={`${px(8)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'dormer', id: d.id, start: toPlan(e.clientX, e.clientY), a0: { ...d.a }, b0: { ...d.b } }, { kind: 'dormer', id: d.id })} />
                 {sel && tool === 'select' && shapeHandles('dormer', d.id, d.a, d.b, rectCorners(d))}
-                {label(`Gaube · ${formatLen(d.height, unit)}`, mid.x, mid.y, 0, '#c77c0a')}
+                {label(`${d.slope ? 'Schleppgaube' : 'Gaube'} · ${formatLen(d.height, unit)}`, mid.x, mid.y, 0, '#c77c0a')}
               </g>
             )
           })}
@@ -1045,6 +1079,21 @@ export default function Editor2D() {
                 <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#0a84ff'} strokeWidth={px(sel ? 3 : 1.6)} strokeDasharray={`${px(3)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'shape', what: 'loggia', id: l.id, start: toPlan(e.clientX, e.clientY), a0: { ...l.a }, b0: { ...l.b } }, { kind: 'loggia', id: l.id })} />
                 {sel && tool === 'select' && shapeHandles('loggia', l.id, l.a, l.b, rectCorners(l))}
                 {label(`Loggia · ${rectArea(l).toFixed(1).replace('.', ',')} m²`, mid.x, mid.y, 0, '#0a6fd0')}
+              </g>
+            )
+          })}
+
+          {/* Dachflächenfenster */}
+          {(floor.skylights ?? []).map((sk) => {
+            const g = skylightGeometry(floor, sk)
+            if (!g) return null
+            const sel = selection?.kind === 'skylight' && selection.id === sk.id
+            const pts = g.pts.map((q) => `${q.x},${q.y}`).join(' ')
+            return (
+              <g key={sk.id}>
+                <polygon points={pts} fill="#8ec5ff" fillOpacity={0.45} stroke={sel ? 'var(--accent)' : '#0a6fd0'} strokeWidth={px(sel ? 3 : 1.8)} style={{ cursor: tool === 'select' ? 'move' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, { kind: 'sky', id: sk.id, start: toPlan(e.clientX, e.clientY), c0: { ...sk.c } }, { kind: 'skylight', id: sk.id })} />
+                <line x1={g.pts[0].x} y1={g.pts[0].y} x2={g.pts[2].x} y2={g.pts[2].y} stroke="#0a6fd0" strokeWidth={px(1)} style={{ pointerEvents: 'none' }} />
+                <line x1={g.pts[1].x} y1={g.pts[1].y} x2={g.pts[3].x} y2={g.pts[3].y} stroke="#0a6fd0" strokeWidth={px(1)} style={{ pointerEvents: 'none' }} />
               </g>
             )
           })}

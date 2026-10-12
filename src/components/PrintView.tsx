@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { PlanOpening } from './OpeningGlyphs'
-import { wallProfile, roofContour, roofAxes, rectCorners, rectArea } from '../lib/roof'
+import { wallProfile, roofContour, roofAxes, rectCorners, rectArea, skylightGeometry } from '../lib/roof'
 import { METHOD_LABEL, isGlazed, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { Cable, Device, Floor, ProjectSettings, Wall, ZoneSettings } from '../types'
@@ -200,6 +200,18 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
             </g>
           )
         })}
+        {(floor.skylights ?? []).map((k) => {
+          const g = skylightGeometry(floor, k)
+          if (!g) return null
+          const c = g.pts
+          return (
+            <g key={k.id}>
+              <polygon points={c.map((q) => `${q.x},${q.y}`).join(' ')} fill="#8ec5ff" opacity={0.5} stroke="#0a6fd0" strokeWidth={px(1)} />
+              <line x1={c[0].x} y1={c[0].y} x2={c[2].x} y2={c[2].y} stroke="#0a6fd0" strokeWidth={px(0.7)} />
+              <line x1={c[1].x} y1={c[1].y} x2={c[3].x} y2={c[3].y} stroke="#0a6fd0" strokeWidth={px(0.7)} />
+            </g>
+          )
+        })}
         {(floor.loggias ?? []).map((l) => {
           const c = rectCorners(l)
           return (
@@ -276,7 +288,7 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
           <>
             <h4>Dach</h4>
             <div className="pv-muted">
-              Orange gestrichelt: Dachschräge (Traufe, 1-m- und 2-m-Linie), Gauben. Blau: Loggia. Schattiert: Bereich mit weniger als 1 m Raumhöhe.
+              Orange gestrichelt: Dachschräge (Traufe, 1-m- und 2-m-Linie), Gauben. Blau: Loggia, Dachflächenfenster (Kreuz). Schattiert: Bereich mit weniger als 1 m Raumhöhe.
             </div>
           </>
         )}

@@ -116,7 +116,16 @@ export interface OrientedRect {
 /** Gaube: hebt die Dachschräge im Rechteck auf die Gaubenhöhe an (Wände dort werden entsprechend höher). */
 export interface Dormer extends OrientedRect {
   id: string
-  height: number // lichte Höhe unter der Gaubendecke über OKFF (mm)
+  height: number // lichte Höhe unter der Gaubendecke über OKFF (mm); bei Schleppgaube: an der Front
+  slope?: number // Neigung der Gaubendecke in ° (Schleppgaube); fehlt/0 = Flachdachgaube
+}
+/** Dachflächenfenster: liegt in der Dachebene `roofId`; c = Mitte im Grundriss, w entlang der Traufe, h entlang der Schräge. */
+export interface Skylight {
+  id: string
+  roofId: string
+  c: Vec2
+  w: number
+  h: number
 }
 /** Loggia: offener, überdachter Außenbereich; an der offenen Seite sitzt eine Brüstung. */
 export interface Loggia extends OrientedRect {
@@ -139,6 +148,7 @@ export interface Floor {
   roofs?: RoofPlane[] // Dachschrägen (begrenzen die Wandhöhe)
   dormers?: Dormer[] // Gauben (heben die Schräge lokal an)
   loggias?: Loggia[] // Loggien / Außenbereiche
+  skylights?: Skylight[] // Dachflächenfenster
   anchor?: Vec2 // Passpunkt zum Übereinanderlegen der Geschosse
 }
 

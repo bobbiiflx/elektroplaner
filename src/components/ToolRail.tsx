@@ -20,6 +20,14 @@ const DormerIcon = ({ size = 19 }: { size?: number }) => (
     <path d="M7.5 15h9" />
   </svg>
 )
+/** Symbol: Dachflächenfenster (Fenster in der Schräge) */
+const SkylightIcon = ({ size = 19 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 20L20 5" />
+    <path d="M8 13l4-4 4 4-4 4z" />
+    <path d="M3 20h18" opacity={0.6} />
+  </svg>
+)
 /** Symbol: Loggia (Nische mit Brüstung) */
 const LoggiaIcon = ({ size = 19 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -34,6 +42,7 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: ReactNode; gro
   { id: 'opening', label: 'Tür / Fenster / Hebe-Schiebetür', key: 'O', icon: <DoorOpen size={19} />, group: 'build' },
   { id: 'roof', label: 'Dachschräge zeichnen', key: 'R', icon: <RoofIcon />, group: 'build' },
   { id: 'dormer', label: 'Gaube zeichnen', key: 'G', icon: <DormerIcon />, group: 'build' },
+  { id: 'skylight', label: 'Dachflächenfenster setzen', key: 'S', icon: <SkylightIcon />, group: 'build' },
   { id: 'loggia', label: 'Loggia / Balkon zeichnen', key: 'L', icon: <LoggiaIcon />, group: 'build' },
   { id: 'device', label: 'Steckdose / Schalter / Dose', key: 'D', icon: <Plug size={19} /> },
   { id: 'cable', label: 'Leitung verlegen', key: 'C', icon: <Cable size={19} /> },

@@ -21,8 +21,8 @@ import { uid } from './lib/geom'
 import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 
-const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'roof', 'dormer', 'loggia', 'calibrate', 'anchor']
-export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'dormer' | 'loggia' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
+const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'roof', 'dormer', 'loggia', 'skylight', 'calibrate', 'anchor']
+export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
 export type ViewMode = 'split' | '2d' | '3d'
 
 export interface AskDialog {
@@ -36,7 +36,7 @@ export interface AskDialog {
 }
 
 export interface Selection {
-  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia'
+  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia' | 'skylight'
   id: string
 }
 
@@ -653,10 +653,13 @@ export const useStore = create<State>((set, get) => ({
         for (const c of f.cables) for (const n of c.points) if (n.deviceId === selection.id) delete n.deviceId
       } else if (selection.kind === 'roof') {
         f.roofs = (f.roofs ?? []).filter((r) => r.id !== selection.id)
+        f.skylights = (f.skylights ?? []).filter((k) => k.roofId !== selection.id)
       } else if (selection.kind === 'dormer') {
         f.dormers = (f.dormers ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'loggia') {
         f.loggias = (f.loggias ?? []).filter((r) => r.id !== selection.id)
+      } else if (selection.kind === 'skylight') {
+        f.skylights = (f.skylights ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'dim') {
         f.dims = (f.dims ?? []).filter((d) => d.id !== selection.id)
       } else {
@@ -688,6 +691,8 @@ function fixSelection() {
               ? (floor.dormers ?? [])
               : selection.kind === 'loggia'
                 ? (floor.loggias ?? [])
+                : selection.kind === 'skylight'
+                ? (floor.skylights ?? [])
             : selection.kind === 'dim'
               ? (floor.dims ?? [])
               : floor.cables

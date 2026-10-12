@@ -503,3 +503,22 @@ describe('Mehrfachauswahl und Kopieren', () => {
     expect(g.walls.length + g.devices.length + g.cables.length).toBe(0)
   })
 })
+
+import { dormerHeightAt, roofPlaneAt, skylightGeometry } from './roof'
+describe('Schleppgaube und Dachflächenfenster', () => {
+  it('Schleppgaube fällt nach hinten; Dachfenster liegt auf der Ebene', () => {
+    const f = newFloor(DEFAULT_SETTINGS, 'DG')
+    f.wallHeight = 3000
+    f.roofs = [{ id: 'r', a: { x: 0, y: 0 }, b: { x: 6000, y: 0 }, side: 1, knee: 1000, angle: 40 }]
+    f.dormers = [{ id: 'd', a: { x: 1000, y: 0 }, b: { x: 3000, y: 0 }, side: 1, depth: 1500, height: 2300, slope: 15 }]
+    const d = f.dormers[0]
+    expect(dormerHeightAt(d, { x: 2000, y: 0 })).toBe(2300)
+    expect(dormerHeightAt(d, { x: 2000, y: 1500 })).toBeCloseTo(2300 - Math.tan((15 * Math.PI) / 180) * 1500, 0)
+    expect(roofHeightAt(f, { x: 2000, y: 100 }, 3000)).toBeGreaterThan(roofHeightAt(f, { x: 4500, y: 100 }, 3000))
+    expect(roofPlaneAt(f, { x: 4500, y: 800 })?.id).toBe('r')
+    f.skylights = [{ id: 's', roofId: 'r', c: { x: 4500, y: 800 }, w: 780, h: 1180 }]
+    const g = skylightGeometry(f, f.skylights[0])!
+    expect(g.pts.length).toBe(4)
+    expect(g.hs[2]).toBeGreaterThan(g.hs[0])
+  })
+})

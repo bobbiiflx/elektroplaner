@@ -699,6 +699,7 @@ function InspectorTabs() {
   const select = useStore((s) => s.select)
   const go = (t: typeof tab) => {
     select(null)
+    useStore.getState().setPickerOpen(false)
     // Bau-Werkzeug beenden, wenn man zu den Elektro-Tabs wechselt
     const st = useStore.getState()
     if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia'].includes(st.tool)) st.setTool('select')

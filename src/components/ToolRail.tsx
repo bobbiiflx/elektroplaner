@@ -60,7 +60,10 @@ export default function ToolRail() {
       {TOOLS.filter((t) => !t.group && t.id === 'select').map(btn)}
 
       <div className="tool-group">
-        <button className={'tool' + (buildActive ? ' on' : open ? ' open' : '')} title="Bauen: Wände, Türen, Fenster" aria-label="Bauen" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <button className={'tool' + (buildActive ? ' on' : open ? ' open' : '')} title="Bauen: Wände, Türen, Fenster" aria-label="Bauen" aria-expanded={open} onClick={() => {
+            useStore.getState().setPickerOpen(false)
+            setOpen((v) => !v)
+          }}>
           <Hammer size={19} />
         </button>
         {open && (

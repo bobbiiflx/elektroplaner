@@ -11,6 +11,8 @@ import { horizontalBands, verticalSpans } from '../lib/zones'
 import { DeviceFace, PlanSymbolShape } from './DeviceIcons'
 import { ElevationDims, FreeDim, PlanDims } from './dims'
 import { Segmented } from './ui'
+import { CabinetDiagram, CabinetLayout } from './CabinetViews'
+import { DEFAULT_CABINET_OPTS, planCabinet } from '../lib/cabinet'
 import { buildTables, type Cell, type Table } from '../lib/lists'
 
 type Paper = 'A4' | 'A3'
@@ -38,6 +40,7 @@ type Page =
   | { kind: 'plan' }
   | { kind: 'wall'; wall: Wall; wi: number; side: 1 | -1; rows: Row[]; first: boolean; part: number }
   | { kind: 'cables'; rows: Row[]; part: number }
+  | { kind: 'cabinet'; part: 0 | 1 }
   | { kind: 'table'; title: string; table: Table; rows: Cell[][]; warn: (string | undefined)[]; part: number }
 
 const pickScale = (fits: (n: number) => boolean) => NICE.find(fits) ?? NICE[NICE.length - 1]
@@ -576,6 +579,7 @@ export default function PrintView() {
       const capN = Math.max(4, Math.floor((areaH - 14) / ROW_H))
       chunk(rows, capN, capN).forEach((rs, part) => out.push({ kind: 'cables', rows: rs, part }))
     }
+    if (opts.lists && (project.circuits?.length ?? 0) > 0) out.push({ kind: 'cabinet', part: 0 }, { kind: 'cabinet', part: 1 })
     if (opts.lists || opts.material) {
       const T = buildTables(project, unit)
       const defs: { title: string; t: Table }[] = []
@@ -634,6 +638,23 @@ export default function PrintView() {
                 <WallPage floor={floor} wall={p.wall} wi={p.wi} side={p.side} rows={p.rows} first={p.first} opts={opts} unit={unit} areaW={areaW} areaH={areaH} zones={zones} settings={project.settings} />
               </Sheet>
             )
+          if (p.kind === 'cabinet') {
+            const cab = planCabinet(project, project.cabinet ?? DEFAULT_CABINET_OPTS)
+            return (
+              <Sheet key={i} {...common} floorName="Gesamtprojekt" title={p.part === 0 ? 'Schaltschrank – Belegung der Hutschienen' : 'Schaltschrank – Übersichtsschaltplan'}>
+                {p.part === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4mm' }}>
+                    <CabinetLayout cab={cab} />
+                    <div className="pv-muted">
+                      {cab.rows.length} Reihe(n) × {cab.rowTE} TE · belegt {cab.teUsed} TE · Reserve {cab.teReserve} TE · Reihenklemmen: {cab.terminals.n} × N, {cab.terminals.pe} × PE (inkl. Reserve)
+                    </div>
+                  </div>
+                ) : (
+                  <CabinetDiagram cab={cab} />
+                )}
+              </Sheet>
+            )
+          }
           if (p.kind === 'table')
             return (
               <Sheet key={i} {...common} floorName="Gesamtprojekt" title={`${p.title}${p.part ? ' (Forts.)' : ''}`}>

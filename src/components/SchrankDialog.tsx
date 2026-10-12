@@ -12,8 +12,10 @@ import { NumberField } from './NumberField'
 import { VAT, materialList } from '../lib/material'
 import { RICHTWERT_NAME } from '../lib/priceSources'
 import PriceImportDialog from './PriceImportDialog'
+import { CabinetDiagram, CabinetLayout } from './CabinetViews'
+import { DEFAULT_CABINET_OPTS, planCabinet } from '../lib/cabinet'
 
-type Tab = 'circuits' | 'channels' | 'ga' | 'ways' | 'material'
+type Tab = 'circuits' | 'cabinet' | 'channels' | 'ga' | 'ways' | 'material'
 
 function DataTable({ t }: { t: Table }) {
   return (
@@ -76,6 +78,8 @@ export default function SchrankDialog() {
   const current: { tables: { title: string; t: Table }[] } =
     tab === 'circuits'
       ? { tables: [{ title: 'Stromkreisliste', t: circuits }] }
+      : tab === 'cabinet'
+        ? { tables: [] }
       : tab === 'channels'
         ? { tables: [{ title: 'Aktorbedarf je Verteiler', t: needs }, { title: 'Aktorkanäle', t: channels }] }
         : tab === 'ga'
@@ -85,7 +89,7 @@ export default function SchrankDialog() {
             : { tables: [{ title: 'Material & Kosten (netto)', t: matTable }] }
 
   const csv = () => current.tables.map(({ title, t }) => toCsv([[title], t.head, ...t.rows])).join('\r\n\r\n')
-  const label = { circuits: 'stromkreise', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege', material: 'material' }[tab]
+  const label = { circuits: 'stromkreise', cabinet: 'belegung', channels: 'aktorkanaele', ga: 'gruppenadressen', ways: 'leitungswege', material: 'material' }[tab]
   const safe = project.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '_').trim() || 'projekt'
 
   return (
@@ -132,6 +136,7 @@ export default function SchrankDialog() {
           onChange={setTab}
           options={[
             { value: 'circuits', label: 'Stromkreise' },
+            { value: 'cabinet', label: 'Belegung & Schaltplan' },
             { value: 'channels', label: 'Aktorkanäle' },
             { value: 'ga', label: 'Gruppenadressen' },
             { value: 'ways', label: 'Leitungswege' },
@@ -257,6 +262,40 @@ export default function SchrankDialog() {
           </p>
         </div>
       ) : null}
+      {tab === 'cabinet' && (() => {
+        const co = project.cabinet ?? DEFAULT_CABINET_OPTS
+        const cab = planCabinet(project, co)
+        return (
+          <div className="schrank-table">
+            <div className="mat-opts">
+              <label className="check">
+                Reihenbreite
+                <select value={co.rowTE} onChange={(e) => edit((p) => void (p.cabinet = { ...co, rowTE: Number(e.target.value) }))}>
+                  {[12, 18, 24].map((n) => (
+                    <option key={n} value={n}>{n} TE</option>
+                  ))}
+                </select>
+              </label>
+              <label className="check">
+                Reserve
+                <select value={co.reservePct} onChange={(e) => edit((p) => void (p.cabinet = { ...co, reservePct: Number(e.target.value) }))}>
+                  {[0, 10, 20, 30, 40].map((n) => (
+                    <option key={n} value={n}>{n} %</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="muted small">
+              {cab.rows.length} Reihe(n) × {cab.rowTE} TE = {cab.teTotal} TE · belegt {cab.teUsed} TE · Reserve {cab.teReserve} TE. Reihenklemmen: {cab.terminals.n} × N, {cab.terminals.pe} × PE, {cab.terminals.l} × L-Verteilung (inkl. Reserve).
+            </p>
+            <h3>Belegung der Hutschienen</h3>
+            <CabinetLayout cab={cab} />
+            <h3>Übersichtsschaltplan (einpolig)</h3>
+            <CabinetDiagram cab={cab} />
+            <p className="muted small">Richtwerte: Hauptschalter 3 TE, ÜSS 2 TE, FI 4 TE, LS 1 TE (3-polig 3 TE), KNX-Netzteil und Aktoren je 4 TE. Bitte mit dem tatsächlichen Hersteller-Sortiment abgleichen.</p>
+          </div>
+        )
+      })()}
       {tab !== 'material' && current.tables.map(({ title, t }) => (
         <div key={title} className="schrank-table">
           <h3>{title}</h3>

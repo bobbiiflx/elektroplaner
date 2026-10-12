@@ -228,6 +228,7 @@ export interface Project {
   priceSourceId?: string // 'katalog' | 'richtwert' | PriceSource.id
   prices?: Record<string, number> // eigene Einzelpreise (€) je Position, überschreiben die Richtwerte
   scenes?: Scene[]
+  cabinet?: { rowTE: number; reservePct: number } // Schaltschrank-Belegung
 }
 
 export interface PriceSource {

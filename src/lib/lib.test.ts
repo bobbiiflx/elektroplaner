@@ -522,3 +522,18 @@ describe('Schleppgaube und Dachflächenfenster', () => {
     expect(g.hs[2]).toBeGreaterThan(g.hs[0])
   })
 })
+
+import { planCabinet } from './cabinet'
+describe('Schaltschrank-Belegung', () => {
+  it('packt FI-Gruppen in Reihen und lässt Reserve', () => {
+    const p = sampleProject()
+    p.circuits = Array.from({ length: 14 }, (_, i) => ({ id: 'c' + i, name: `F${i + 1} Test`, rating: 16, charac: 'B', phase: 'L1', rcd: i < 7 ? 'FI 1 · 30 mA' : 'FI 2 · 30 mA', color: '#f00' })) as never
+    const cab = planCabinet(p, { rowTE: 24, reservePct: 20 })
+    expect(cab.groups.length).toBe(2)
+    expect(cab.rows.every((r) => r.used <= 24)).toBe(true)
+    expect(cab.teReserve).toBeGreaterThanOrEqual(2)
+    const mcb = cab.rows.flatMap((r) => r.modules).filter((m) => m.kind === 'mcb').length
+    expect(mcb).toBe(14)
+    expect(cab.terminals.n).toBeGreaterThan(14)
+  })
+})

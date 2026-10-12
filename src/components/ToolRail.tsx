@@ -12,11 +12,29 @@ const RoofIcon = ({ size = 19 }: { size?: number }) => (
   </svg>
 )
 
+/** Symbol: Gaube (Hausschnitt mit Aufbau) */
+const DormerIcon = ({ size = 19 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 21L12 4l10 17" />
+    <path d="M8.5 21v-6h7v6" />
+    <path d="M7.5 15h9" />
+  </svg>
+)
+/** Symbol: Loggia (Nische mit Brüstung) */
+const LoggiaIcon = ({ size = 19 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 3v18M20 3v18M4 3h16" />
+    <path d="M4 15h16M9 15v6M15 15v6" />
+  </svg>
+)
+
 export const TOOLS: { id: Tool; label: string; key: string; icon: ReactNode; group?: 'build' }[] = [
   { id: 'select', label: 'Auswählen', key: 'V', icon: <MousePointer2 size={19} /> },
   { id: 'wall', label: 'Wand zeichnen', key: 'W', icon: <BrickWall size={19} />, group: 'build' },
   { id: 'opening', label: 'Tür / Fenster / Hebe-Schiebetür', key: 'O', icon: <DoorOpen size={19} />, group: 'build' },
   { id: 'roof', label: 'Dachschräge zeichnen', key: 'R', icon: <RoofIcon />, group: 'build' },
+  { id: 'dormer', label: 'Gaube zeichnen', key: 'G', icon: <DormerIcon />, group: 'build' },
+  { id: 'loggia', label: 'Loggia / Balkon zeichnen', key: 'L', icon: <LoggiaIcon />, group: 'build' },
   { id: 'device', label: 'Steckdose / Schalter / Dose', key: 'D', icon: <Plug size={19} /> },
   { id: 'cable', label: 'Leitung verlegen', key: 'C', icon: <Cable size={19} /> },
   { id: 'measure', label: 'Lineal – Maße zeichnen', key: 'M', icon: <Ruler size={19} /> },

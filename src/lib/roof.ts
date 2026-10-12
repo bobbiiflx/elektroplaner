@@ -1,4 +1,4 @@
-import type { Floor, RoofPlane, Vec2, Wall } from '../types'
+import type { Floor, OrientedRect, RoofPlane, Vec2, Wall } from '../types'
 import { wallLength } from './geom'
 
 const rad = (d: number) => (d * Math.PI) / 180
@@ -32,10 +32,32 @@ export function roofHeightAt(floor: Floor, p: Vec2, cap = floor.wallHeight): num
     const v = planeHeightAt(r, p)
     if (v !== null && v < h) h = v
   }
+  // Gauben heben die Schräge im Rechteck auf ihre lichte Höhe an
+  for (const d of floor.dormers ?? []) if (inRect(d, p, TOL) && d.height > h) h = Math.min(cap, d.height)
   return Math.max(0, h)
 }
 
-export const hasRoof = (floor: Floor) => (floor.roofs?.length ?? 0) > 0
+// --- Rechtecke (Gaube, Loggia) -------------------------------------------
+export function rectAxes(r: OrientedRect): { u: Vec2; n: Vec2; L: number } {
+  const L = Math.hypot(r.b.x - r.a.x, r.b.y - r.a.y) || 1
+  const u = { x: (r.b.x - r.a.x) / L, y: (r.b.y - r.a.y) / L }
+  return { u, n: { x: -u.y * r.side, y: u.x * r.side }, L }
+}
+export function rectCorners(r: OrientedRect): Vec2[] {
+  const { n } = rectAxes(r)
+  return [r.a, r.b, { x: r.b.x + n.x * r.depth, y: r.b.y + n.y * r.depth }, { x: r.a.x + n.x * r.depth, y: r.a.y + n.y * r.depth }]
+}
+export function inRect(r: OrientedRect, p: Vec2, tol = 0): boolean {
+  const { u, n, L } = rectAxes(r)
+  const rx = p.x - r.a.x, ry = p.y - r.a.y
+  const along = rx * u.x + ry * u.y
+  const d = rx * n.x + ry * n.y
+  return along >= -tol && along <= L + tol && d >= -tol && d <= r.depth + tol
+}
+export const rectArea = (r: OrientedRect) => (rectAxes(r).L * r.depth) / 1e6 // m²
+export const rectWidth = (r: OrientedRect) => rectAxes(r).L
+
+export const hasRoof = (floor: Floor) => (floor.roofs?.length ?? 0) > 0 || (floor.dormers?.length ?? 0) > 0
 
 export interface ProfilePt { u: number; h: number }
 
@@ -110,6 +132,24 @@ export function roofIssues(floor: Floor): RoofIssue[] {
   for (const c of floor.cables) {
     const bad = c.points.find((pt) => pt.z > roofHeightAt(floor, { x: pt.x, y: pt.y }) + 20)
     if (bad) out.push({ kind: 'cable', id: c.id, text: `Leitungspunkt auf ${Math.round(bad.z / 10)} cm liegt über der Dachschräge` })
+  }
+  return out
+}
+
+export interface LoggiaNote { id: string; text: string }
+/** Geräte in einer Loggia (Außenbereich): IP-Schutz und RCD nötig. */
+export function loggiaNotes(floor: Floor): LoggiaNote[] {
+  const out: LoggiaNote[] = []
+  if (!(floor.loggias?.length)) return out
+  for (const d of floor.devices) {
+    let p: Vec2 | null = null
+    const w = floor.walls.find((x) => x.id === d.wallId)
+    if (w) {
+      const L = wallLength(w) || 1
+      const f = d.offset / L
+      p = { x: w.a.x + (w.b.x - w.a.x) * f, y: w.a.y + (w.b.y - w.a.y) * f }
+    } else if (d.x !== undefined && d.y !== undefined) p = { x: d.x, y: d.y }
+    if (p && floor.loggias.some((l) => inRect(l, p!, 150))) out.push({ id: d.id, text: 'in der Loggia: Außenbereich – spritzwassergeschützt (mind. IP44), Stromkreis mit RCD 30 mA' })
   }
   return out
 }

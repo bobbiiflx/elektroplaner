@@ -6,9 +6,9 @@ import { cableType, devType, isGlazed } from '../config/catalog'
 import { elevationOf } from '../lib/factory'
 import { boundsOf, cableLengths, pointOnWall, wallAngleDeg, wallDir, wallLength, wallNormal } from '../lib/geom'
 import { horizontalBands, verticalSpans } from '../lib/zones'
-import { minProfile, roofAxes, wallProfile } from '../lib/roof'
+import { minProfile, rectAxes, roofAxes, wallProfile } from '../lib/roof'
 import { useStore } from '../store'
-import type { Cable, Device, Floor, Opening, Project, RoofPlane, Wall } from '../types'
+import type { Cable, Device, Floor, Opening, OrientedRect, Project, RoofPlane, Wall } from '../types'
 
 const ACCENT = '#0071e3'
 const mm = (v: number) => v / 1000
@@ -135,6 +135,20 @@ function WallMesh({
           </mesh>
         ))}
     </group>
+  )
+}
+
+/** Rechteckiger Körper über einer Grundfläche (Gaube als Volumen, Loggia als Bodenplatte) */
+function RectMesh({ rect, height, color, opacity }: { rect: OrientedRect; height: number; color: string; opacity: number }) {
+  const { u, n, L } = rectAxes(rect)
+  const cx = rect.a.x + u.x * (L / 2) + n.x * (rect.depth / 2)
+  const cy = rect.a.y + u.y * (L / 2) + n.y * (rect.depth / 2)
+  const rotY = -Math.atan2(u.y, u.x)
+  return (
+    <mesh position={[mm(cx), mm(height / 2), mm(cy)]} rotation={[0, rotY, 0]} raycast={() => null}>
+      <boxGeometry args={[mm(L), mm(height), mm(rect.depth)]} />
+      <meshStandardMaterial color={color} transparent opacity={opacity} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -362,6 +376,12 @@ function FloorModel({
         ))}
         {(floor.roofs ?? []).map((r) => (
           <RoofMesh key={r.id} roof={r} cap={floor.wallHeight} opacity={active ? 1 : 0.4} />
+        ))}
+        {(floor.dormers ?? []).map((d) => (
+          <RectMesh key={d.id} rect={d} height={d.height} color="#ff9f0a" opacity={0.16 * (active ? 1 : 0.4)} />
+        ))}
+        {(floor.loggias ?? []).map((l) => (
+          <RectMesh key={l.id} rect={l} height={40} color="#0a84ff" opacity={0.4 * (active ? 1 : 0.4)} />
         ))}
       </group>
       {floor.devices.map((d) => (

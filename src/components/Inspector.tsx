@@ -23,8 +23,8 @@ import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } fr
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
 import { OPENING_TYPES, openingDef } from '../config/catalog'
-import { roofContour, roofIssues } from '../lib/roof'
-import type { RoofPlane } from '../types'
+import { loggiaNotes, rectArea, rectWidth, roofContour, roofIssues } from '../lib/roof'
+import type { Dormer, Loggia, RoofPlane } from '../types'
 import { OpeningIcon } from './OpeningGlyphs'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
@@ -52,6 +52,12 @@ export default function Inspector() {
   } else if (selection?.kind === 'roof') {
     const r = (floor.roofs ?? []).find((x) => x.id === selection.id)
     body = r ? <RoofPanel roof={r} floor={floor} /> : null
+  } else if (selection?.kind === 'dormer') {
+    const d = (floor.dormers ?? []).find((x) => x.id === selection.id)
+    body = d ? <DormerPanel dormer={d} floor={floor} /> : null
+  } else if (selection?.kind === 'loggia') {
+    const l = (floor.loggias ?? []).find((x) => x.id === selection.id)
+    body = l ? <LoggiaPanel loggia={l} /> : null
   } else if (selection?.kind === 'dim') {
     const m = (floor.dims ?? []).find((x) => x.id === selection.id)
     body = m ? <DimPanel dim={m} /> : null
@@ -369,6 +375,94 @@ function RoofPanel({ roof, floor }: { roof: RoofPlane; floor: Floor }) {
   )
 }
 
+function DormerPanel({ dormer, floor }: { dormer: Dormer; floor: Floor }) {
+  const editFloor = useEditFloor()
+  const unit = useStore((s) => s.unit)
+  const upd = (fn: (d: Dormer) => void, key?: string) =>
+    editFloor((f) => {
+      const d = (f.dormers ?? []).find((x) => x.id === dormer.id)
+      if (d) fn(d)
+    }, key)
+  const key = (k: string) => `${k}:${dormer.id}`
+  return (
+    <Section title="Gaube">
+      <Row label="Lichte Höhe" hint="unter Gaubendecke">
+        <LenField mm={dormer.height} min={1500} max={floor.wallHeight} onCommit={(v) => upd((d) => void (d.height = v), key('h'))} />
+      </Row>
+      <Row label="Tiefe" hint="in den Raum">
+        <LenField mm={dormer.depth} min={300} onCommit={(v) => upd((d) => void (d.depth = v), key('d'))} />
+      </Row>
+      <Row label="Breite">
+        <b>{formatLen(rectWidth(dormer), unit)}</b>
+      </Row>
+      <Row label="Seite">
+        <button className="btn small" onClick={() => upd((d) => void (d.side = (d.side === 1 ? -1 : 1) as 1 | -1))}>
+          Seite wechseln
+        </button>
+      </Row>
+      <p className="muted small">Im Rechteck wird die Dachschräge bis zur lichten Höhe angehoben. Die Wände der Gaube (Front, Wangen) zeichnest du wie normale Wände auf den Rand; Fenster setzt du in die Frontwand. Maximal bis zur Firsthöhe des Geschosses ({formatLen(floor.wallHeight, unit)}).</p>
+    </Section>
+  )
+}
+
+function LoggiaPanel({ loggia }: { loggia: Loggia }) {
+  const editFloor = useEditFloor()
+  const unit = useStore((s) => s.unit)
+  const upd = (fn: (l: Loggia, f: Floor) => void, key?: string) =>
+    editFloor((f) => {
+      const l = (f.loggias ?? []).find((x) => x.id === loggia.id)
+      if (l) fn(l, f)
+    }, key)
+  const key = (k: string) => `${k}:${loggia.id}`
+  return (
+    <Section title="Loggia">
+      <Row label="Fläche">
+        <b>{rectArea(loggia).toFixed(2).replace('.', ',')} m²</b>
+      </Row>
+      <Row label="Tiefe">
+        <LenField mm={loggia.depth} min={500} onCommit={(v) => upd((l) => void (l.depth = v), key('d'))} />
+      </Row>
+      <Row label="Brüstung" hint="Höhe">
+        <LenField
+          mm={loggia.parapet}
+          min={300}
+          onCommit={(v) =>
+            upd((l, f) => {
+              l.parapet = v
+              const w = f.walls.find((x) => x.id === l.parapetWallId)
+              if (w) w.height = v
+            }, key('p'))
+          }
+        />
+      </Row>
+      <Row label="Seite">
+        <button className="btn small" onClick={() => upd((l) => void (l.side = (l.side === 1 ? -1 : 1) as 1 | -1))}>
+          Seite wechseln
+        </button>
+      </Row>
+      <p className="muted small">Außenbereich: Geräte hier müssen spritzwassergeschützt sein (mind. IP44) und an einem Stromkreis mit RCD 30 mA hängen. Die Länge der offenen Seite: {formatLen(rectWidth(loggia), unit)}.</p>
+    </Section>
+  )
+}
+
+function LoggiaWarnings({ floor }: { floor: Floor }) {
+  const notes = useMemo(() => loggiaNotes(floor), [floor])
+  const select = useStore((s) => s.select)
+  if (!notes.length) return null
+  return (
+    <Section title="Loggia – Außenbereich">
+      <p className="small" style={{ color: 'var(--warn, #c77c0a)' }}>
+        {notes.length} Gerät{notes.length === 1 ? '' : 'e'} im Außenbereich:
+      </p>
+      {notes.slice(0, 8).map((n) => (
+        <button key={n.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'device', id: n.id })}>
+          Gerät {n.text}
+        </button>
+      ))}
+    </Section>
+  )
+}
+
 function RoofWarnings({ floor }: { floor: Floor }) {
   const issues = useMemo(() => roofIssues(floor), [floor])
   const select = useStore((s) => s.select)
@@ -611,6 +705,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
         </button>
       </div>
       {tab !== 'floor' && <RoofWarnings floor={floor} />}
+      {tab !== 'floor' && <LoggiaWarnings floor={floor} />}
       {tab === 'floor' && (
       <>
       <Section title="Geschoss">
@@ -640,7 +735,30 @@ function FloorPanel({ floor }: { floor: Floor }) {
           Dachschräge zeichnen
         </button>
       </Section>
+      <Section title="Gauben">
+        {(floor.dormers ?? []).length === 0 && <p className="muted small">Gaube: Front-Linie und Tiefe aufziehen – die Dachschräge wird dort bis zur Gaubenhöhe angehoben.</p>}
+        {(floor.dormers ?? []).map((d, i) => (
+          <button key={d.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'dormer', id: d.id })}>
+            Gaube {i + 1} · {Math.round(rectWidth(d) / 10)} × {Math.round(d.depth / 10)} cm · {Math.round(d.height / 10)} cm hoch
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('dormer')}>
+          Gaube zeichnen
+        </button>
+      </Section>
+      <Section title="Loggia / Balkon">
+        {(floor.loggias ?? []).length === 0 && <p className="muted small">Offene Seite und Tiefe aufziehen – die Brüstung wird ergänzt, Geräte dort werden als Außenbereich geprüft.</p>}
+        {(floor.loggias ?? []).map((l, i) => (
+          <button key={l.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'loggia', id: l.id })}>
+            Loggia {i + 1} · {rectArea(l).toFixed(1).replace('.', ',')} m²
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('loggia')}>
+          Loggia zeichnen
+        </button>
+      </Section>
       <RoofWarnings floor={floor} />
+      <LoggiaWarnings floor={floor} />
 
       {project.floors.length > 1 && (
         <Section title="Geschosse stapeln">

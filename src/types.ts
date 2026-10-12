@@ -106,6 +106,25 @@ export interface RoofPlane {
   angle: number // Neigung in Grad
 }
 
+/** Rechteck, ausgehend von der Linie a–b (z. B. Gaubenfront) mit Tiefe zur Seite `side` (Normale (-dy, dx) · side). */
+export interface OrientedRect {
+  a: Vec2
+  b: Vec2
+  depth: number
+  side: 1 | -1
+}
+/** Gaube: hebt die Dachschräge im Rechteck auf die Gaubenhöhe an (Wände dort werden entsprechend höher). */
+export interface Dormer extends OrientedRect {
+  id: string
+  height: number // lichte Höhe unter der Gaubendecke über OKFF (mm)
+}
+/** Loggia: offener, überdachter Außenbereich; an der offenen Seite sitzt eine Brüstung. */
+export interface Loggia extends OrientedRect {
+  id: string
+  parapet: number // Brüstungshöhe (mm)
+  parapetWallId?: string
+}
+
 export interface Floor {
   id: string
   name: string
@@ -118,6 +137,8 @@ export interface Floor {
   cables: Cable[]
   dims?: Dimension[]
   roofs?: RoofPlane[] // Dachschrägen (begrenzen die Wandhöhe)
+  dormers?: Dormer[] // Gauben (heben die Schräge lokal an)
+  loggias?: Loggia[] // Loggien / Außenbereiche
   anchor?: Vec2 // Passpunkt zum Übereinanderlegen der Geschosse
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../config/catalog'
 import { findGap } from './gaps'
-import { roofHeightAt, wallProfile, roofContour, roofIssues } from './roof'
+import { roofHeightAt, wallProfile, roofContour, roofIssues, inRect, loggiaNotes, rectArea } from './roof'
 import { cableLengths, nearestWall, pointOnWall, wallLength } from './geom'
 import { sampleProject, elevationOf } from './factory'
 import { formatLen, fromDisplay, parseNum, toDisplay } from './units'
@@ -441,5 +441,27 @@ describe('Dachschräge', () => {
     f.cables = []
     const issues = roofIssues(f)
     expect(issues.map((i) => i.id)).toEqual(['d2'])
+  })
+})
+
+describe('Gaube und Loggia', () => {
+  it('Gaube hebt die Schräge im Rechteck auf die lichte Höhe an', () => {
+    const f = sampleProject().floors[0]
+    f.wallHeight = 3500
+    f.roofs = [{ id: 'r', a: { x: 0, y: 0 }, b: { x: 6000, y: 0 }, side: 1, knee: 1000, angle: 45 }]
+    f.dormers = [{ id: 'g', a: { x: 2000, y: 0 }, b: { x: 4000, y: 0 }, side: 1, depth: 1500, height: 2300 }]
+    expect(Math.round(roofHeightAt(f, { x: 1000, y: 500 }))).toBe(1500) // neben der Gaube: Schräge
+    expect(roofHeightAt(f, { x: 3000, y: 500 })).toBe(2300) // in der Gaube
+    expect(Math.round(roofHeightAt(f, { x: 3000, y: 1800 }))).toBe(2800) // hinter der Gaube wieder die Schräge
+    expect(inRect(f.dormers[0], { x: 3000, y: 700 })).toBe(true)
+    expect(inRect(f.dormers[0], { x: 3000, y: 2000 })).toBe(false)
+  })
+  it('Loggia: Fläche und Außenbereich-Hinweis', () => {
+    const f = sampleProject().floors[0]
+    f.walls = [{ id: 'w', a: { x: 0, y: 0 }, b: { x: 4000, y: 0 }, thickness: 240, kind: 'outer' as const }]
+    f.loggias = [{ id: 'l', a: { x: 0, y: 0 }, b: { x: 3000, y: 0 }, side: 1, depth: 2000, parapet: 1000 }]
+    f.devices = [{ id: 'd1', typeId: 'steckdose-1', wallId: 'w', offset: 1000, side: 1, height: 300 } as never, { id: 'd2', typeId: 'steckdose-1', wallId: 'w', offset: 3800, side: 1, height: 300 } as never]
+    expect(rectArea(f.loggias[0])).toBe(6)
+    expect(loggiaNotes(f).map((n) => n.id)).toEqual(['d1'])
   })
 })

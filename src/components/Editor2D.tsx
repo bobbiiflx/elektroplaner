@@ -2,7 +2,7 @@ import { planPoint } from '../lib/runs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { findGap, type WallGap } from '../lib/gaps'
-import { roofAxes, roofContour } from '../lib/roof'
+import { roofAxes, roofContour, rectArea, rectCorners } from '../lib/roof'
 import { PlanOpening } from './OpeningGlyphs'
 import { openingDef, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
 import { useFloor, useStore } from '../store'
@@ -56,6 +56,8 @@ const HINTS: Record<string, string> = {
   measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
   roof: 'Dachschräge: 1. und 2. Klick = Linie, an der die Schräge beginnt (Kniestock/Traufe) · 3. Klick = Seite, zu der sie ansteigt (in den Raum)',
+  dormer: 'Gaube: 1. und 2. Klick = Gaubenfront (Außenkante) · 3. Klick = Tiefe in den Raum (zieht die Rechteckfläche auf)',
+  loggia: 'Loggia: 1. und 2. Klick = offene Seite (Brüstung) · 3. Klick = Tiefe in den Raum',
   anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
 }
 
@@ -396,21 +398,49 @@ export default function Editor2D() {
       setRoofB(p)
       return
     }
-    // 3. Klick: Seite des Anstiegs
+    // 3. Klick: Seite des Anstiegs bzw. Tiefe
     const dx = roofB.x - roofA.x, dy = roofB.y - roofA.y
-    const side: 1 | -1 = (raw.x - roofA.x) * -dy + (raw.y - roofA.y) * dx >= 0 ? 1 : -1
-    const id = uid('r_')
+    const proj = ((raw.x - roofA.x) * -dy + (raw.y - roofA.y) * dx) / (Math.hypot(dx, dy) || 1)
+    const side: 1 | -1 = proj >= 0 ? 1 : -1
+    const id = uid(tool === 'roof' ? 'r_' : tool === 'dormer' ? 'g_' : 'l_')
     const a = roofA, b = roofB
-    edit((p) => {
-      const f = p.floors.find((x) => x.id === floor.id)
-      if (!f) return
-      f.roofs = f.roofs ?? []
-      f.roofs.push({ id, a, b, side, knee: 1000, angle: 40 })
-    })
+    if (tool === 'roof') {
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (!f) return
+        f.roofs = f.roofs ?? []
+        f.roofs.push({ id, a, b, side, knee: 1000, angle: 40 })
+      })
+      select({ kind: 'roof', id })
+      showToast('Dachschräge angelegt – Kniestock und Neigung stehen rechts.')
+    } else if (tool === 'dormer') {
+      const depth = Math.max(500, Math.round(Math.abs(proj) / 50) * 50)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (!f) return
+        f.dormers = f.dormers ?? []
+        f.dormers.push({ id, a, b, side, depth, height: Math.min(2300, floor.wallHeight) })
+      })
+      select({ kind: 'dormer', id })
+      showToast('Gaube angelegt – die Wände dort werden bis zur Gaubenhöhe hochgezogen. Gaubenwände zeichnest du wie normale Wände.')
+    } else {
+      const depth = Math.max(500, Math.round(Math.abs(proj) / 50) * 50)
+      const wid = uid('w_')
+      const parapet = 1000
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const hasWall = !!nearestWall(floor.walls, mid, 60)
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        if (!f) return
+        f.loggias = f.loggias ?? []
+        if (!hasWall) f.walls.push({ id: wid, a: { ...a }, b: { ...b }, thickness: 120, kind: 'outer', height: parapet })
+        f.loggias.push({ id, a, b, side, depth, parapet, parapetWallId: hasWall ? undefined : wid })
+      })
+      select({ kind: 'loggia', id })
+      showToast(hasWall ? 'Loggia angelegt.' : 'Loggia angelegt – Brüstung an der offenen Seite wurde als Wand ergänzt.')
+    }
     setRoofA(null)
     setRoofB(null)
-    select({ kind: 'roof', id })
-    showToast('Dachschräge angelegt – Kniestock und Neigung stehen rechts.')
   }
 
   const placeDevice = (raw: Vec2) => {
@@ -577,6 +607,8 @@ export default function Editor2D() {
         placeOpening(raw)
         break
       case 'roof':
+      case 'dormer':
+      case 'loggia':
         addRoofPoint(raw, orthoNow)
         break
       case 'device':
@@ -695,7 +727,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof' | 'dormer' | 'loggia'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -887,20 +919,54 @@ export default function Editor2D() {
               </g>
             )
           })}
-          {tool === 'roof' && roofA && cursor && (() => {
+          {(tool === 'roof' || tool === 'dormer' || tool === 'loggia') && roofA && cursor && (() => {
             const b = roofB ?? snap(cursor, roofA, opts.ortho, true).p
             const dx = b.x - roofA.x, dy = b.y - roofA.y
             const L = Math.hypot(dx, dy) || 1
             let nx = -dy / L, ny = dx / L
-            if (roofB && (cursor.x - roofA.x) * -dy + (cursor.y - roofA.y) * dx < 0) { nx = -nx; ny = -ny }
+            let depth = px(60)
+            if (roofB) {
+              const pr = (cursor.x - roofA.x) * nx + (cursor.y - roofA.y) * ny
+              if (pr < 0) { nx = -nx; ny = -ny }
+              if (tool !== 'roof') depth = Math.max(500, Math.abs(pr))
+            }
             return (
               <g style={{ pointerEvents: 'none' }}>
                 <line x1={roofA.x} y1={roofA.y} x2={b.x} y2={b.y} stroke="#ff9f0a" strokeWidth={px(2.5)} strokeDasharray={`${px(10)} ${px(5)}`} />
                 <circle cx={roofA.x} cy={roofA.y} r={px(4)} fill="#ff9f0a" />
-                {roofB && <polygon points={`${roofA.x},${roofA.y} ${b.x},${b.y} ${b.x + nx * px(60)},${b.y + ny * px(60)} ${roofA.x + nx * px(60)},${roofA.y + ny * px(60)}`} fill="#ff9f0a" opacity={0.18} />}
+                {roofB && <polygon points={`${roofA.x},${roofA.y} ${b.x},${b.y} ${b.x + nx * depth},${b.y + ny * depth} ${roofA.x + nx * depth},${roofA.y + ny * depth}`} fill={tool === 'loggia' ? '#0a84ff' : '#ff9f0a'} opacity={0.2} />}
+                {roofB && tool !== 'roof' && label(formatLen(depth, unit), (roofA.x + b.x) / 2 + nx * depth, (roofA.y + b.y) / 2 + ny * depth, 0, 'var(--ink)')}
               </g>
             )
           })()}
+
+          {/* Gauben und Loggien */}
+          {(floor.dormers ?? []).map((d) => {
+            const sel = selection?.kind === 'dormer' && selection.id === d.id
+            const pts = rectCorners(d).map((q) => `${q.x},${q.y}`).join(' ')
+            const c = rectCorners(d)
+            const mid = { x: (c[0].x + c[2].x) / 2, y: (c[0].y + c[2].y) / 2 }
+            return (
+              <g key={d.id}>
+                <polygon points={pts} fill="#ff9f0a" opacity={0.14} style={{ pointerEvents: 'none' }} />
+                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#c77c0a'} strokeWidth={px(sel ? 3 : 2)} strokeDasharray={`${px(8)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'dormer', id: d.id })} />
+                {label(`Gaube · ${formatLen(d.height, unit)}`, mid.x, mid.y, 0, '#c77c0a')}
+              </g>
+            )
+          })}
+          {(floor.loggias ?? []).map((l) => {
+            const sel = selection?.kind === 'loggia' && selection.id === l.id
+            const pts = rectCorners(l).map((q) => `${q.x},${q.y}`).join(' ')
+            const c = rectCorners(l)
+            const mid = { x: (c[0].x + c[2].x) / 2, y: (c[0].y + c[2].y) / 2 }
+            return (
+              <g key={l.id}>
+                <polygon points={pts} fill="#0a84ff" opacity={0.12} style={{ pointerEvents: 'none' }} />
+                <polygon points={pts} fill="transparent" stroke={sel ? 'var(--accent)' : '#0a84ff'} strokeWidth={px(sel ? 3 : 1.6)} strokeDasharray={`${px(3)} ${px(4)}`} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'all' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'loggia', id: l.id })} />
+                {label(`Loggia · ${rectArea(l).toFixed(1).replace('.', ',')} m²`, mid.x, mid.y, 0, '#0a6fd0')}
+              </g>
+            )
+          })}
 
           {/* Wände */}
           {floor.walls.map((w) => {

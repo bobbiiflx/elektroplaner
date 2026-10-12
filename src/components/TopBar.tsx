@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, Eye, FileOutput, FolderOpen, ImageUp, Monitor, Moon, Pencil, Plus, Printer, Redo2, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, Download, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
 import { exportJson } from '../lib/storage'
 import { UNITS } from '../lib/units'
@@ -201,12 +201,20 @@ function ViewMenu() {
           </div>
           <div className="menu-block">
             <div className="menu-title">Anzeige im Plan</div>
-            <label className="check">
-              <input type="checkbox" checked={showDims} onChange={toggleDims} /> Bemaßung zeigen
-            </label>
-            <label className="check" title={hasBackground ? 'Importierten PDF-/Bild-Grundriss im Plan aus- oder einblenden' : 'Noch kein Grundriss importiert'}>
-              <input type="checkbox" checked={showBackground} disabled={!hasBackground} onChange={toggleBackground} /> Grundriss (PDF/Bild) zeigen
-            </label>
+            <div className="toggle-row">
+              <button className={'toggle-btn' + (showDims ? ' on' : '')} aria-pressed={showDims} onClick={toggleDims} title="Bemaßung im Plan ein-/ausblenden">
+                <Ruler size={16} /> Bemaßung
+              </button>
+              <button
+                className={'toggle-btn' + (showBackground && hasBackground ? ' on' : '')}
+                aria-pressed={showBackground}
+                disabled={!hasBackground}
+                onClick={toggleBackground}
+                title={hasBackground ? 'Importierten PDF-/Bild-Grundriss im Plan ein-/ausblenden' : 'Noch kein Grundriss importiert'}
+              >
+                <ImageIcon size={16} /> Grundriss
+              </button>
+            </div>
             <ColorByControl />
           </div>
           <div className="menu-block">

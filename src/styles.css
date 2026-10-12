@@ -1351,3 +1351,35 @@ p {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* --- Umschalter mit Symbol (blau hinterlegt = an) ------------------------- */
+.toggle-row {
+  display: flex;
+  gap: 6px;
+}
+.toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.toggle-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.toggle-btn.on {
+  background: var(--accent);
+  color: #fff;
+}
+.toggle-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -194,6 +194,61 @@ export default function Editor2D() {
     return () => svg.removeEventListener('wheel', onWheel)
   }, [])
 
+  // --- Zwei-Finger-Geste (Touch): Zoomen und Verschieben --------------------
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const pts = new Map<number, { x: number; y: number }>()
+    let g: { d0: number; v0: View; m0: { x: number; y: number } } | null = null
+    const mid = () => {
+      const [a, b] = [...pts.values()]
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) }
+    }
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pts.size === 2) {
+        e.stopPropagation()
+        dragRef.current = null
+        setPanning(false)
+        const m = mid()
+        const r = svg.getBoundingClientRect()
+        setView((v) => {
+          g = { d0: Math.max(m.d, 1), v0: v, m0: { x: m.x - r.left, y: m.y - r.top } }
+          return v
+        })
+      }
+    }
+    const move = (e: PointerEvent) => {
+      if (!pts.has(e.pointerId)) return
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pts.size !== 2 || !g) return
+      e.stopPropagation()
+      const m = mid()
+      const r = svg.getBoundingClientRect()
+      const { d0, v0, m0 } = g
+      const ns = clamp(v0.s * (m.d / d0), MIN_S, MAX_S)
+      const px0 = (m0.x - v0.tx) / v0.s
+      const py0 = (m0.y - v0.ty) / v0.s
+      setView({ s: ns, tx: m.x - r.left - px0 * ns, ty: m.y - r.top - py0 * ns })
+    }
+    const up = (e: PointerEvent) => {
+      if (pts.size === 2) e.stopPropagation()
+      pts.delete(e.pointerId)
+      if (pts.size < 2) g = null
+    }
+    svg.addEventListener('pointerdown', down)
+    svg.addEventListener('pointermove', move)
+    svg.addEventListener('pointerup', up)
+    svg.addEventListener('pointercancel', up)
+    return () => {
+      svg.removeEventListener('pointerdown', down)
+      svg.removeEventListener('pointermove', move)
+      svg.removeEventListener('pointerup', up)
+      svg.removeEventListener('pointercancel', up)
+    }
+  }, [])
+
   const zoomBy = (k: number) => {
     setView((v) => {
       const ns = clamp(v.s * k, MIN_S, MAX_S)

@@ -1,4 +1,6 @@
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { Box, HardHat, Map as MapIcon, SlidersHorizontal, X } from 'lucide-react'
+import { useIsMobile } from './lib/useMobile'
 import AskDialog from './components/AskDialog'
 import Editor2D from './components/Editor2D'
 import Inspector from './components/Inspector'
@@ -22,7 +24,84 @@ function Toast() {
   return <div className="toast glass">{toast}</div>
 }
 
+/** Handy-Ansicht: ein Bereich auf einmal (Grundriss, 3D oder Details) mit Leiste unten. */
+function MobileShell() {
+  const [tab, setTab] = useState<'plan' | '3d' | 'details'>('plan')
+  const planPane = useStore((s) => s.planPane)
+  const selection = useStore((s) => s.selection)
+  const select = useStore((s) => s.select)
+  const setSite = useStore((s) => s.setSiteMode)
+  const sheet = tab === 'plan' && !!selection
+  return (
+    <div className="app mobile">
+      <TopBar compact />
+      <div className="m-body">
+        <div className="m-pane" style={{ display: tab === 'plan' ? 'block' : 'none' }}>
+          <div style={{ display: planPane === 'plan' ? 'contents' : 'none' }}>
+            <Editor2D />
+          </div>
+          {planPane === 'wall' && <WallElevation />}
+          <ToolRail />
+        </div>
+        {tab === '3d' && (
+          <div className="m-pane">
+            <Suspense fallback={<div className="loading">3D wird geladen …</div>}>
+              <View3D />
+            </Suspense>
+          </div>
+        )}
+        {tab === 'details' && (
+          <aside className="inspector m-full">
+            <Inspector />
+          </aside>
+        )}
+        {sheet && (
+          <aside className="inspector m-sheet">
+            <div className="m-sheet-head">
+              <span className="m-grip" />
+              <button className="icon-btn" aria-label="Schließen" onClick={() => select(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <Inspector />
+          </aside>
+        )}
+      </div>
+      <nav className="m-nav glass">
+        <button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>
+          <MapIcon size={20} />
+          <span>Grundriss</span>
+        </button>
+        <button className={tab === '3d' ? 'on' : ''} onClick={() => setTab('3d')}>
+          <Box size={20} />
+          <span>3D</span>
+        </button>
+        <button className={tab === 'details' ? 'on' : ''} onClick={() => setTab('details')}>
+          <SlidersHorizontal size={20} />
+          <span>Details</span>
+        </button>
+        <button onClick={() => setSite(true)}>
+          <HardHat size={20} />
+          <span>Baustelle</span>
+        </button>
+      </nav>
+      <Suspense fallback={null}>
+        <SchrankHost />
+      </Suspense>
+      <SettingsDialog />
+      <AskDialog />
+      <Toast />
+    </div>
+  )
+}
+
+function SchrankHost() {
+  const schrankOpen = useStore((s) => s.schrankOpen)
+  return schrankOpen ? <SchrankDialog /> : null
+}
+
 export default function App() {
+  const mobile = useIsMobile()
   const ready = useStore((s) => s.ready)
   const viewMode = useStore((s) => s.viewMode)
   const planPane = useStore((s) => s.planPane)
@@ -95,6 +174,7 @@ export default function App() {
     )
 
   if (siteMode) return <SiteView />
+  if (mobile) return <MobileShell />
 
   return (
     <div className="app">

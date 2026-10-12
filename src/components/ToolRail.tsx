@@ -1,6 +1,7 @@
 import { BrickWall, Cable, DoorOpen, Hammer, MousePointer2, Plug, Ruler, ScanSearch, Scaling } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useStore, type Tool } from '../store'
+import { useIsMobile } from '../lib/useMobile'
 
 /** Symbol: Dachschräge im Schnitt */
 const RoofIcon = ({ size = 19 }: { size?: number }) => (
@@ -63,6 +64,7 @@ export default function ToolRail() {
   const setTool = useStore((s) => s.setTool)
   const setWallDetectOpen = useStore((s) => s.setWallDetectOpen)
   const [open, setOpen] = useState(false)
+  const mobile = useIsMobile()
 
   const build = TOOLS.filter((t) => t.group === 'build')
   const buildActive = build.some((t) => t.id === tool)
@@ -71,6 +73,16 @@ export default function ToolRail() {
       {t.icon}
     </button>
   )
+
+  if (mobile) {
+    // Handy: nur die wichtigsten Werkzeuge
+    const keep: Tool[] = ['select', 'device', 'cable', 'measure']
+    return (
+      <div className="toolrail glass" onPointerDown={(e) => e.stopPropagation()}>
+        {TOOLS.filter((t) => keep.includes(t.id)).map(btn)}
+      </div>
+    )
+  }
 
   return (
     <div className="toolrail glass" onPointerDown={(e) => e.stopPropagation()}>

@@ -473,7 +473,7 @@ function OutputMenu() {
   )
 }
 
-export default function TopBar() {
+export default function TopBar({ compact = false }: { compact?: boolean }) {
   const project = useStore((s) => s.project)
   const activeFloorId = useStore((s) => s.activeFloorId)
   const setActiveFloor = useStore((s) => s.setActiveFloor)
@@ -485,7 +485,7 @@ export default function TopBar() {
   const setSettingsOpen = useStore((s) => s.setSettingsOpen)
 
   return (
-    <header className="topbar glass">
+    <header className={'topbar glass' + (compact ? ' compact' : '')}>
       <ProjectMenu />
 
       <nav className="floors" aria-label="Geschosse">
@@ -494,16 +494,22 @@ export default function TopBar() {
             {f.name}
           </button>
         ))}
-        <button className="floor-add" title="Geschoss hinzufügen" onClick={() => addFloor()}>
-          <Plus size={15} />
-        </button>
+        {!compact && (
+          <button className="floor-add" title="Geschoss hinzufügen" onClick={() => addFloor()}>
+            <Plus size={15} />
+          </button>
+        )}
       </nav>
 
       <div className="spacer" />
 
-      <ViewMenu />
-      <OutputMenu />
-      <span className="vsep" />
+      {!compact && (
+        <>
+          <ViewMenu />
+          <OutputMenu />
+          <span className="vsep" />
+        </>
+      )}
 
       <div className="btn-group">
         <button className="icon-btn" title="Rückgängig (⌘Z)" disabled={!canUndo} onClick={undo}>
@@ -512,9 +518,11 @@ export default function TopBar() {
         <button className="icon-btn" title="Wiederholen (⇧⌘Z)" disabled={!canRedo} onClick={redo}>
           <Redo2 size={17} />
         </button>
-        <button className="icon-btn" title="Projekteinstellungen" onClick={() => setSettingsOpen(true)}>
-          <Settings2 size={17} />
-        </button>
+        {!compact && (
+          <button className="icon-btn" title="Projekteinstellungen" onClick={() => setSettingsOpen(true)}>
+            <Settings2 size={17} />
+          </button>
+        )}
       </div>
     </header>
   )

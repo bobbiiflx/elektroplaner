@@ -130,7 +130,7 @@ export default function ToolRail() {
         )}
       </div>
 
-      {TOOLS.filter((t) => !t.group && t.id !== 'select').map(btn)}
+      {TOOLS.filter((t) => !t.group && t.id !== 'select' && t.id !== 'calibrate').map(btn)}
     </div>
   )
 }

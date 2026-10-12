@@ -73,6 +73,7 @@ interface State {
   viewMode: ViewMode
   showZones: boolean
   showDims: boolean
+  showBackground: boolean
   colorBy: ColorBy
   printOpen: boolean
   schrankOpen: boolean
@@ -105,6 +106,7 @@ interface State {
   setViewMode: (v: ViewMode) => void
   toggleZones: () => void
   toggleDims: () => void
+  toggleBackground: () => void
   setColorBy: (c: ColorBy) => void
   setSchrankOpen: (v: boolean) => void
   setInspectorTab: (t: 'floor' | 'electric' | 'knx' | 'cabinet') => void
@@ -204,6 +206,7 @@ export const useStore = create<State>((set, get) => ({
   viewMode: 'split',
   showZones: false,
   showDims: true,
+  showBackground: true,
   colorBy: 'type',
   printOpen: false,
   schrankOpen: false,
@@ -281,6 +284,7 @@ export const useStore = create<State>((set, get) => ({
   setViewMode: (viewMode) => set({ viewMode }),
   toggleZones: () => set((s) => ({ showZones: !s.showZones })),
   toggleDims: () => set((s) => ({ showDims: !s.showDims })),
+  toggleBackground: () => set((s) => ({ showBackground: !s.showBackground })),
   setColorBy: (colorBy) => set({ colorBy }),
   setSchrankOpen: (schrankOpen) => set({ schrankOpen }),
   setInspectorTab: (inspectorTab) => set({ inspectorTab }),

@@ -171,6 +171,9 @@ function ViewMenu() {
   const setViewMode = useStore((s) => s.setViewMode)
   const showDims = useStore((s) => s.showDims)
   const toggleDims = useStore((s) => s.toggleDims)
+  const showBackground = useStore((s) => s.showBackground)
+  const toggleBackground = useStore((s) => s.toggleBackground)
+  const hasBackground = useStore((s) => Object.keys(s.backgrounds).some((k) => !k.includes('~')))
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   return (
@@ -200,6 +203,9 @@ function ViewMenu() {
             <div className="menu-title">Anzeige im Plan</div>
             <label className="check">
               <input type="checkbox" checked={showDims} onChange={toggleDims} /> Bemaßung zeigen
+            </label>
+            <label className="check" title={hasBackground ? 'Importierten PDF-/Bild-Grundriss im Plan aus- oder einblenden' : 'Noch kein Grundriss importiert'}>
+              <input type="checkbox" checked={showBackground} disabled={!hasBackground} onChange={toggleBackground} /> Grundriss (PDF/Bild) zeigen
             </label>
             <ColorByControl />
           </div>

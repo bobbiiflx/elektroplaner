@@ -99,6 +99,7 @@ export default function Editor2D() {
   const settings = project.settings
   const bg = floor.background
   const bgUrl = backgrounds[floor.id]
+  const showBackground = useStore((s) => s.showBackground)
   const s = view.s
 
   // --- Größe & Einpassen --------------------------------------------------
@@ -767,7 +768,7 @@ export default function Editor2D() {
         </defs>
 
         <g transform={`translate(${view.tx} ${view.ty}) scale(${s})`}>
-          {bg && bgUrl && (
+          {bg && bgUrl && showBackground && (
             <image
               href={bgUrl}
               x={bg.x ?? 0}

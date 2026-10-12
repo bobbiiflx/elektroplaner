@@ -2,3 +2,7 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Persönliche Pläne und Projektexporte (enthalten Grundrisse) nie einchecken
+*.pdf
+*.elektroplaner.json

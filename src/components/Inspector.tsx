@@ -65,14 +65,17 @@ export default function Inspector() {
 
   if (!body) return <FloorPanel floor={floor} />
 
+  const buildKind = selection?.kind === 'roof' || selection?.kind === 'dormer' || selection?.kind === 'loggia'
   return (
     <div className="inspector-body">
+      <InspectorTabs />
       {body}
       <div className="section">
         <button className="btn danger block" onClick={deleteSelection}>
           <Trash2 size={15} /> Löschen
         </button>
       </div>
+      {buildKind && <BuildSections floor={floor} />}
     </div>
   )
 }
@@ -644,6 +647,81 @@ function Check({ ok, text }: { ok: boolean; text: string }) {
 }
 
 // ---------------------------------------------------------------------------
+/** Dachschrägen, Gauben, Loggia: Listen mit „zeichnen“-Knöpfen und Prüfhinweisen (im Bau-Tab und neben der Auswahl) */
+function BuildSections({ floor }: { floor: Floor }) {
+  const setTool = useStore((s) => s.setTool)
+  const select = useStore((s) => s.select)
+  return (
+    <>
+      <Section title="Dachschrägen">
+        {(floor.roofs ?? []).length === 0 && <p className="muted small">Für Dachgeschosse: Linie ziehen, an der die Schräge beginnt (Kniestock), dann die Neigung einstellen. Wände werden schräg abgeschnitten, über der Schräge ist keine Wand.</p>}
+        {(floor.roofs ?? []).map((r, i) => (
+          <button key={r.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'roof', id: r.id })}>
+            Dachschräge {i + 1} · Kniestock {Math.round(r.knee / 10)} cm · {Math.round(r.angle)}°
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('roof')}>
+          Dachschräge zeichnen
+        </button>
+      </Section>
+      <Section title="Gauben">
+        {(floor.dormers ?? []).length === 0 && <p className="muted small">Gaube: Front-Linie und Tiefe aufziehen – die Dachschräge wird dort bis zur Gaubenhöhe angehoben.</p>}
+        {(floor.dormers ?? []).map((d, i) => (
+          <button key={d.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'dormer', id: d.id })}>
+            Gaube {i + 1} · {Math.round(rectWidth(d) / 10)} × {Math.round(d.depth / 10)} cm · {Math.round(d.height / 10)} cm hoch
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('dormer')}>
+          Gaube zeichnen
+        </button>
+      </Section>
+      <Section title="Loggia / Balkon">
+        {(floor.loggias ?? []).length === 0 && <p className="muted small">Offene Seite und Tiefe aufziehen – die Brüstung wird ergänzt, Geräte dort werden als Außenbereich geprüft.</p>}
+        {(floor.loggias ?? []).map((l, i) => (
+          <button key={l.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'loggia', id: l.id })}>
+            Loggia {i + 1} · {rectArea(l).toFixed(1).replace('.', ',')} m²
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('loggia')}>
+          Loggia zeichnen
+        </button>
+      </Section>
+      <RoofWarnings floor={floor} />
+      <LoggiaWarnings floor={floor} />
+    </>
+  )
+}
+
+/** Tab-Leiste: Elektro · KNX · Schrank, Bau als Symbol. Ein Klick beendet die Auswahl und zeigt den Tab. */
+function InspectorTabs() {
+  const tab = useStore((s) => s.inspectorTab)
+  const setTab = useStore((s) => s.setInspectorTab)
+  const select = useStore((s) => s.select)
+  const go = (t: typeof tab) => {
+    select(null)
+    // Bau-Werkzeug beenden, wenn man zu den Elektro-Tabs wechselt
+    const st = useStore.getState()
+    if (t !== 'floor' && ['wall', 'opening', 'roof', 'dormer', 'loggia'].includes(st.tool)) st.setTool('select')
+    setTab(t)
+  }
+  return (
+    <div className="inspector-tabs">
+      <Segmented
+        value={tab}
+        onChange={go}
+        options={[
+          { value: 'electric', label: 'Elektro' },
+          { value: 'knx', label: 'KNX' },
+          { value: 'cabinet', label: 'Schrank' },
+        ]}
+      />
+      <button className={'tab-icon' + (tab === 'floor' ? ' on' : '')} title="Bau: Geschoss, Grundriss, Dachschrägen, Gauben, Loggia" aria-label="Bau" aria-pressed={tab === 'floor'} onClick={() => go('floor')}>
+        <Hammer size={16} />
+      </button>
+    </div>
+  )
+}
+
 function FloorPanel({ floor }: { floor: Floor }) {
   const edit = useStore((s) => s.edit)
   const project = useStore((s) => s.project)
@@ -690,20 +768,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
 
   return (
     <div className="inspector-body">
-      <div className="inspector-tabs">
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'electric', label: 'Elektro' },
-            { value: 'knx', label: 'KNX' },
-            { value: 'cabinet', label: 'Schrank' },
-          ]}
-        />
-        <button className={'tab-icon' + (tab === 'floor' ? ' on' : '')} title="Bau: Geschoss, Grundriss, Dachschrägen" aria-label="Bau" aria-pressed={tab === 'floor'} onClick={() => setTab('floor')}>
-          <Hammer size={16} />
-        </button>
-      </div>
+      <InspectorTabs />
       {tab !== 'floor' && <RoofWarnings floor={floor} />}
       {tab !== 'floor' && <LoggiaWarnings floor={floor} />}
       {tab === 'floor' && (
@@ -724,41 +789,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
         </Row>
       </Section>
 
-      <Section title="Dachschrägen">
-        {(floor.roofs ?? []).length === 0 && <p className="muted small">Für Dachgeschosse: Linie ziehen, an der die Schräge beginnt (Kniestock), dann die Neigung einstellen. Wände werden schräg abgeschnitten, über der Schräge ist keine Wand.</p>}
-        {(floor.roofs ?? []).map((r, i) => (
-          <button key={r.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'roof', id: r.id })}>
-            Dachschräge {i + 1} · Kniestock {Math.round(r.knee / 10)} cm · {Math.round(r.angle)}°
-          </button>
-        ))}
-        <button className="btn block" onClick={() => setTool('roof')}>
-          Dachschräge zeichnen
-        </button>
-      </Section>
-      <Section title="Gauben">
-        {(floor.dormers ?? []).length === 0 && <p className="muted small">Gaube: Front-Linie und Tiefe aufziehen – die Dachschräge wird dort bis zur Gaubenhöhe angehoben.</p>}
-        {(floor.dormers ?? []).map((d, i) => (
-          <button key={d.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'dormer', id: d.id })}>
-            Gaube {i + 1} · {Math.round(rectWidth(d) / 10)} × {Math.round(d.depth / 10)} cm · {Math.round(d.height / 10)} cm hoch
-          </button>
-        ))}
-        <button className="btn block" onClick={() => setTool('dormer')}>
-          Gaube zeichnen
-        </button>
-      </Section>
-      <Section title="Loggia / Balkon">
-        {(floor.loggias ?? []).length === 0 && <p className="muted small">Offene Seite und Tiefe aufziehen – die Brüstung wird ergänzt, Geräte dort werden als Außenbereich geprüft.</p>}
-        {(floor.loggias ?? []).map((l, i) => (
-          <button key={l.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'loggia', id: l.id })}>
-            Loggia {i + 1} · {rectArea(l).toFixed(1).replace('.', ',')} m²
-          </button>
-        ))}
-        <button className="btn block" onClick={() => setTool('loggia')}>
-          Loggia zeichnen
-        </button>
-      </Section>
-      <RoofWarnings floor={floor} />
-      <LoggiaWarnings floor={floor} />
+      <BuildSections floor={floor} />
 
       {project.floors.length > 1 && (
         <Section title="Geschosse stapeln">

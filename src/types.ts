@@ -60,6 +60,8 @@ export interface Device {
   y?: number
   // Elektrische Zuordnung (Schaltschrank-Grundlagen)
   circuitId?: string
+  distId?: string // Verteiler (Gerät), zu dem die Leitung läuft; leer = automatisch
+  runLen?: number // gemessene/gesetzte Leitungslänge zum Verteiler in mm (überschreibt die Schätzung)
   groupIds?: string[] // KNX-Gruppen: Taster/Sensoren senden, Leuchten/Lasten empfangen
   control?: 'direct' | 'knx' // direkt über Schalter/Sicherung oder über KNX-Aktor geschaltet
   dimmable?: boolean // nur Leuchten: ja / nein (undefined = noch nicht entschieden)
@@ -131,6 +133,8 @@ export interface ProjectSettings {
   innerThickness: number
   levelHeight: number
   grid: number
+  runPct?: number // Zuschlag auf geschätzte Leitungswege in % (Standard 10)
+  runReserve?: number // fester Zuschlag je Leitung in mm (Standard 1000)
   seriesId?: string // Standard-Schalterserie für neue und nicht abweichende Geräte
   zones: ZoneSettings
   vde: VdeSettings

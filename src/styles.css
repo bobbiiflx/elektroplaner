@@ -1115,3 +1115,7 @@ p {
 .scene-line select{max-width:60%}
 .scene-val{display:flex;align-items:center;gap:4px}
 .status-line.small{font-size:11.5px}
+.run-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;margin:6px 0}
+.run-table th{text-align:left;font-weight:600;color:var(--muted,#8e8e93);padding:2px 4px}
+.run-table td{padding:3px 4px;border-top:1px solid rgba(128,128,128,.2)}
+.run-table th:nth-child(n+2),.run-table td:nth-child(n+2){text-align:right}

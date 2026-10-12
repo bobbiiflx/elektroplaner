@@ -100,8 +100,10 @@ export const DEVICE_TYPES: DeviceType[] = [
   { id: 'dimm-t', name: 'Dimmer (Drehknopf)', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 45, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'dimm-d', name: 'Dimmer (Drehknopf, Raststellung)', category: 'switch', defaultHeight: 1050, w: 80, h: 80, d: 12, color: '#64d2ff', price: 55, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'l-aussen', name: 'Außenstehleuchte', category: 'light', mount: 'floor', defaultHeight: 300, w: 250, h: 600, d: 250, color: '#ffd60a', price: 120, boxPrice: 0, defaultPowerW: 10 },
+  { id: 'steig', name: 'Steigpunkt (Leerrohr / Schacht)', category: 'box', mount: 'floor', defaultHeight: 1250, w: 250, h: 2500, d: 250, color: '#bf5af2', price: 25, boxPrice: 0 },
   { id: 'kab-aus', name: 'Kabelauslassdose (Bürste)', category: 'box', defaultHeight: 1100, w: 80, h: 80, d: 12, color: '#8e8e93', price: 7, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'dose-ab', name: 'Abzweigdose', category: 'box', defaultHeight: 2300, w: 80, h: 80, d: 4, color: '#8e8e93', price: 1.8, boxPrice: 0, sizes: [{ id: 'a70', label: 'Abzweigdose Ø 70', w: 70, h: 70 }, { id: 'a80', label: 'Abzweigdose Ø 80', w: 80, h: 80 }, { id: 'a100', label: 'Abzweigdose Ø 100', w: 100, h: 100 }] },
+  { id: 'hv', name: 'Hauptverteiler', category: 'box', defaultHeight: 1500, w: 800, h: 1100, d: 200, color: '#48484a', price: 650, boxPrice: 0, sizes: [{ id: 'h1', label: 'Schaltschrank 800 × 1100', w: 800, h: 1100 }, { id: 'h2', label: 'Schaltschrank 800 × 1400', w: 800, h: 1400 }, { id: 'h3', label: 'Schaltschrank 1000 × 1800', w: 1000, h: 1800 }] },
   { id: 'uv', name: 'Unterverteiler', category: 'box', defaultHeight: 1500, w: 400, h: 600, d: 80, color: '#636366', price: 120, boxPrice: 0, sizes: [{ id: 'u1', label: 'Verteiler 1 × 12 TE (≈ 300 × 200)', w: 300, h: 200 }, { id: 'u2', label: 'Verteiler 2 × 12 TE (≈ 300 × 330)', w: 300, h: 330 }, { id: 'u3', label: 'Verteiler 3 × 12 TE (≈ 400 × 600)', w: 400, h: 600 }] },
 ]
 

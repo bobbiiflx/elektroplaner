@@ -44,7 +44,7 @@ import sd2 from '../assets/icons/sd-2.png'
 import sd3 from '../assets/icons/sd-3.png'
 import sw1 from '../assets/icons/sw-1.png'
 import swJal from '../assets/icons/sw-jal.png'
-import uv from '../assets/icons/uv.png'
+import uvImg from '../assets/icons/uv.png'
 
 export const DEVICE_IMG: Record<string, string> = {
   'sd-1': sd1,
@@ -70,6 +70,7 @@ export const DEVICE_IMG: Record<string, string> = {
   'knx-pm': knxPm,
   'dimm-t': dimmT,
   'dimm-d': dimmD,
+  'hv': uvImg,
   'sd-4': sd4,
   'sd-herd': sdHerd,
   'pin': pin,
@@ -86,7 +87,7 @@ export const DEVICE_IMG: Record<string, string> = {
   'knx-ts': knxTs,
   disp,
   'dose-ab': doseAb,
-  uv,
+  uv: uvImg,
 }
 
 export const CABLE_IMG: Record<string, string> = {

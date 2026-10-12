@@ -221,3 +221,27 @@ describe('groups', () => {
     expect(p.scenes[0].values.g1).toBeUndefined()
   })
 })
+
+import { runOf, runSummary } from './runs'
+import { newFloor } from './factory'
+describe('Leitungswege', () => {
+  it('schätzt über Steigpunkte und mehrere Geschosse; manuelle Länge gewinnt', () => {
+    const p = sampleProject()
+    const eg = p.floors[0]
+    const keller = newFloor(p.settings, 'Keller')
+    keller.walls = eg.walls.map((w) => ({ ...w, id: 'k' + w.id }))
+    p.floors.unshift(keller)
+    keller.devices.push({ id: 'hv1', typeId: 'hv', wallId: 'kw1', offset: 1000, side: 1, height: 1500 })
+    keller.devices.push({ id: 'st0', typeId: 'steig', wallId: '', offset: 0, side: 1, height: 1250, x: 1500, y: 1500 })
+    eg.devices.push({ id: 'st1', typeId: 'steig', wallId: '', offset: 0, side: 1, height: 1250, x: 1500, y: 1500 })
+    eg.devices.push({ id: 'l1', typeId: 'l-decke', wallId: '', offset: 0, side: 1, height: 2465, x: 1500, y: 3500, control: 'knx' })
+    const r = runOf(p, eg.devices.find((d) => d.id === 'l1')!)!
+    expect(r.dist.device.id).toBe('hv1')
+    expect(r.warn).toBeUndefined()
+    expect(r.vert).toBe(Math.abs(p.floors[0].levelHeight + 2465 - 1500))
+    expect(r.len).toBe(r.horiz + r.vert + r.extra)
+    eg.devices.find((d) => d.id === 'l1')!.runLen = 9000
+    expect(runOf(p, eg.devices.find((d) => d.id === 'l1')!)!.len).toBe(9000)
+    expect(runSummary(p).perDist[0].runs).toBeGreaterThanOrEqual(1)
+  })
+})

@@ -115,6 +115,8 @@ interface State {
 
   setActiveFloor: (id: string) => void
   addFloor: () => string
+  /** Legt ein Geschoss unter dem untersten an (Keller), optional mit den Wänden des bisher untersten Geschosses. */
+  addBasement: (copyWalls: boolean) => string
   removeFloor: (id: string) => void
   setBackground: (floorId: string, dataUrl: string, bg: Background) => void
   clearBackground: (floorId: string) => void
@@ -356,6 +358,19 @@ export const useStore = create<State>((set, get) => ({
     const f = newFloor(project.settings, `Geschoss ${project.floors.length + 1}`)
     get().edit((p) => {
       p.floors.push(f)
+    })
+    set({ activeFloorId: f.id, selection: null })
+    return f.id
+  },
+
+  addBasement: (copyWalls) => {
+    const { project } = get()
+    const f = newFloor(project.settings, 'Keller')
+    const above = project.floors[0]
+    if (copyWalls && above)
+      f.walls = above.walls.map((w) => ({ ...w, id: uid('w_'), a: { ...w.a }, b: { ...w.b } }))
+    get().edit((p) => {
+      p.floors.unshift(f)
     })
     set({ activeFloorId: f.id, selection: null })
     return f.id

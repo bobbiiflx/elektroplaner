@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { PlanOpening } from './OpeningGlyphs'
-import { wallProfile } from '../lib/roof'
+import { wallProfile, roofContour, roofAxes, rectCorners, rectArea } from '../lib/roof'
 import { METHOD_LABEL, isGlazed, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { Cable, Device, Floor, ProjectSettings, Wall, ZoneSettings } from '../types'
@@ -165,6 +165,51 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
             </g>
           )
         })}
+        {(floor.roofs ?? []).map((r) => {
+          const { n } = roofAxes(r)
+          const ang = (Math.atan2(r.b.y - r.a.y, r.b.x - r.a.x) * 180) / Math.PI
+          const flip = ang > 90 || ang < -90 ? ang + 180 : ang
+          const c1 = roofContour(r, 1000, floor.wallHeight)
+          const c2 = roofContour(r, 2000, floor.wallHeight)
+          const mid = { x: (r.a.x + r.b.x) / 2, y: (r.a.y + r.b.y) / 2 }
+          return (
+            <g key={r.id}>
+              {r.knee < 1000 && c1 && <polygon points={`${r.a.x},${r.a.y} ${r.b.x},${r.b.y} ${c1.b.x},${c1.b.y} ${c1.a.x},${c1.a.y}`} fill="#ff9f0a" opacity={0.15} />}
+              <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke="#c77c0a" strokeWidth={px(1.4)} strokeDasharray={`${px(5)} ${px(2.5)}`} />
+              {[{ c: c1, t: '1 m' }, { c: c2, t: '2 m' }].map(({ c, t }) =>
+                c ? (
+                  <g key={t}>
+                    <line x1={c.a.x} y1={c.a.y} x2={c.b.x} y2={c.b.y} stroke="#c77c0a" strokeWidth={px(0.7)} strokeDasharray={`${px(3)} ${px(2)}`} />
+                    <text x={(c.a.x + c.b.x) / 2 + n.x * px(4)} y={(c.a.y + c.b.y) / 2 + n.y * px(4)} fontSize={px(8.5)} fill="#c77c0a" textAnchor="middle" dominantBaseline="central" transform={`rotate(${flip} ${(c.a.x + c.b.x) / 2 + n.x * px(4)} ${(c.a.y + c.b.y) / 2 + n.y * px(4)})`}>{t}-Linie</text>
+                  </g>
+                ) : null,
+              )}
+              <text x={mid.x + n.x * px(8)} y={mid.y + n.y * px(8)} fontSize={px(9)} fontWeight={700} fill="#c77c0a" textAnchor="middle" dominantBaseline="central" transform={`rotate(${flip} ${mid.x + n.x * px(8)} ${mid.y + n.y * px(8)})`}>
+                Dachschräge {Math.round(r.angle)}° · Kniestock {formatLen(r.knee, unit)}
+              </text>
+            </g>
+          )
+        })}
+        {(floor.dormers ?? []).map((d) => {
+          const c = rectCorners(d)
+          return (
+            <g key={d.id}>
+              <polygon points={c.map((q) => `${q.x},${q.y}`).join(' ')} fill="#ff9f0a" opacity={0.12} />
+              <polygon points={c.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#c77c0a" strokeWidth={px(1.2)} strokeDasharray={`${px(4)} ${px(2)}`} />
+              <text x={(c[0].x + c[2].x) / 2} y={(c[0].y + c[2].y) / 2} fontSize={px(9)} fontWeight={700} fill="#c77c0a" textAnchor="middle" dominantBaseline="central">Gaube · {formatLen(d.height, unit)}</text>
+            </g>
+          )
+        })}
+        {(floor.loggias ?? []).map((l) => {
+          const c = rectCorners(l)
+          return (
+            <g key={l.id}>
+              <polygon points={c.map((q) => `${q.x},${q.y}`).join(' ')} fill="#0a84ff" opacity={0.1} />
+              <polygon points={c.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#0a6fd0" strokeWidth={px(1.2)} strokeDasharray={`${px(1.5)} ${px(2)}`} />
+              <text x={(c[0].x + c[2].x) / 2} y={(c[0].y + c[2].y) / 2} fontSize={px(9)} fontWeight={700} fill="#0a6fd0" textAnchor="middle" dominantBaseline="central">Loggia · {rectArea(l).toFixed(1).replace('.', ',')} m²</text>
+            </g>
+          )
+        })}
         {floor.cables.map((c) => (
           <polyline key={c.id} points={c.points.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={cableType(c.typeId).color} strokeWidth={px(1.6)} strokeLinejoin="round" strokeLinecap="round" />
         ))}
@@ -227,6 +272,14 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
           )
         })}
         {!cabLen.size && <div className="pv-muted">keine</div>}
+        {((floor.roofs?.length ?? 0) + (floor.dormers?.length ?? 0) + (floor.loggias?.length ?? 0)) > 0 && (
+          <>
+            <h4>Dach</h4>
+            <div className="pv-muted">
+              Orange gestrichelt: Dachschräge (Traufe, 1-m- und 2-m-Linie), Gauben. Blau: Loggia. Schattiert: Bereich mit weniger als 1 m Raumhöhe.
+            </div>
+          </>
+        )}
         <h4>Hinweis</h4>
         <div className="pv-muted">Maße in {unit}. W1, W2 … verweisen auf die Wandansichten.</div>
       </aside>

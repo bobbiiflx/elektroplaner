@@ -42,6 +42,8 @@ export default function SiteView() {
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [focus, setFocus] = useState<string | null>(null)
   const done = project.done ?? {}
+  const notes = project.notes ?? {}
+  const photos = useStore((s) => s.photos)
   const floor = project.floors.find((f) => f.id === activeId) ?? project.floors[0]
 
   const all = useMemo(() => project.floors.map((f) => itemsOf(f, unit)), [project.floors, unit])
@@ -155,6 +157,12 @@ export default function SiteView() {
               <span className="site-item-text">
                 <b>{i.title}</b>
                 <small>{i.sub}</small>
+                {notes[i.id]?.text && <span className="site-note">{notes[i.id].text}</span>}
+                {!!notes[i.id]?.photos.length && (
+                  <span className="site-thumbs">
+                    {notes[i.id].photos.map((id) => (photos[id] ? <img key={id} src={photos[id]} alt="Foto" onClick={(e) => (e.stopPropagation(), window.open(photos[id], '_blank'))} /> : null))}
+                  </span>
+                )}
               </span>
             </button>
           ))}

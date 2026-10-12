@@ -10,6 +10,7 @@ export interface Snapshot {
   label: string
   project: Project
 }
+const photoKey = (pid: string, id: string) => `ep:photo:${pid}:${id}`
 const bgKey = (pid: string, fid: string) => `ep:bg:${pid}:${fid}`
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -53,6 +54,18 @@ export async function loadBackground(pid: string, fid: string): Promise<string |
   return safe(async () => (await get<string>(bgKey(pid, fid))) ?? null, null)
 }
 
+export async function savePhoto(pid: string, id: string, dataUrl: string): Promise<void> {
+  await safe(() => set(photoKey(pid, id), dataUrl), undefined)
+}
+
+export async function loadPhoto(pid: string, id: string): Promise<string | null> {
+  return safe(async () => (await get<string>(photoKey(pid, id))) ?? null, null)
+}
+
+export async function deletePhoto(pid: string, id: string): Promise<void> {
+  await safe(() => del(photoKey(pid, id)), undefined)
+}
+
 export async function deleteBackground(pid: string, fid: string): Promise<void> {
   await safe(() => del(bgKey(pid, fid)), undefined)
 }
@@ -62,6 +75,7 @@ export async function deleteProject(p: Project): Promise<void> {
     await del(projKey(p.id))
     await del(snapKey(p.id))
     for (const f of p.floors) await del(bgKey(p.id, f.id))
+    for (const n of Object.values(p.notes ?? {})) for (const id of n.photos) await del(photoKey(p.id, id))
     const metas = ((await get<ProjectMeta[]>(INDEX_KEY)) ?? []).filter((m) => m.id !== p.id)
     await writeIndex(metas)
   }, undefined)
@@ -74,21 +88,24 @@ interface ExportFile {
   version: 1
   project: Project
   backgrounds: Record<string, string>
+  photos?: Record<string, string>
 }
 
-export function exportJson(project: Project, backgrounds: Record<string, string>): string {
+export function exportJson(project: Project, backgrounds: Record<string, string>, photos: Record<string, string> = {}): string {
   const bg: Record<string, string> = {}
   for (const f of project.floors) for (const k of [f.id, f.id + '~mask']) if (backgrounds[k]) bg[k] = backgrounds[k]
-  const file: ExportFile = { app: 'elektroplaner', version: 1, project, backgrounds: bg }
+  const ph: Record<string, string> = {}
+  for (const n of Object.values(project.notes ?? {})) for (const id of n.photos) if (photos[id]) ph[id] = photos[id]
+  const file: ExportFile = { app: 'elektroplaner', version: 1, project, backgrounds: bg, photos: ph }
   return JSON.stringify(file)
 }
 
-export function parseImport(text: string): { project: Project; backgrounds: Record<string, string> } {
+export function parseImport(text: string): { project: Project; backgrounds: Record<string, string>; photos: Record<string, string> } {
   const data = JSON.parse(text) as Partial<ExportFile>
   if (data.app !== 'elektroplaner' || !data.project || !Array.isArray(data.project.floors)) {
     throw new Error('Keine gültige Elektroplaner-Datei')
   }
-  return { project: data.project, backgrounds: data.backgrounds ?? {} }
+  return { project: data.project, backgrounds: data.backgrounds ?? {}, photos: data.photos ?? {} }
 }
 
 // --- Versionen (automatische Sicherungen) ----------------------------------

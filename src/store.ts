@@ -20,6 +20,9 @@ import { nextGA } from './lib/groups'
 import { uid } from './lib/geom'
 import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
+import * as bk from './lib/backup'
+import { shrinkImage } from './lib/image'
+import type { BackupState } from './lib/backup'
 
 const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'room', 'roof', 'dormer', 'loggia', 'skylight', 'calibrate', 'anchor']
 export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'dormer' | 'loggia' | 'skylight' | 'room' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
@@ -84,6 +87,8 @@ interface State {
   showAllFloors: boolean
   ghostWalls: boolean
   toast: string | null
+  backup: { name: string; state: BackupState; at: string | null }
+  photos: Record<string, string> // Foto-ID → Data-URL (nur das geöffnete Projekt)
   importFile: File | null
   settingsOpen: boolean
   ask: AskDialog | null
@@ -130,6 +135,14 @@ interface State {
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
   showToast: (msg: string) => void
+  refreshBackup: () => Promise<void>
+  setNoteText: (elId: string, text: string) => void
+  addPhotos: (elId: string, files: File[]) => Promise<void>
+  removePhoto: (elId: string, photoId: string) => void
+  setBackupFolder: () => Promise<void>
+  grantBackup: () => Promise<void>
+  disableBackup: () => Promise<void>
+  backupNow: () => Promise<boolean>
   openImport: (f: File | null) => void
   setSettingsOpen: (v: boolean) => void
   setAsk: (a: AskDialog | null) => void
@@ -230,6 +243,8 @@ export const useStore = create<State>((set, get) => ({
   showAllFloors: false,
   ghostWalls: false,
   toast: null,
+  backup: { name: '', state: 'off', at: null },
+  photos: {},
   importFile: null,
   settingsOpen: false,
   ask: null,
@@ -259,6 +274,7 @@ export const useStore = create<State>((set, get) => ({
       set({ metas: await storage.listProjects(), project: p, activeFloorId: p.floors[0].id, backgrounds: {} })
     }
     set({ ready: true })
+    void get().refreshBackup()
   },
 
   edit: (recipe, key) => {
@@ -437,6 +453,93 @@ export const useStore = create<State>((set, get) => ({
     toastTimer = window.setTimeout(() => set({ toast: null }), 4500)
   },
 
+  setNoteText: (elId, text) =>
+    get().edit((p) => {
+      const notes = (p.notes ??= {})
+      const n = notes[elId] ?? { text: '', photos: [] }
+      n.text = text
+      if (!n.text && !n.photos.length) delete notes[elId]
+      else notes[elId] = n
+    }, 'note:' + elId),
+
+  addPhotos: async (elId, files) => {
+    const pid = get().project.id
+    const added: Record<string, string> = {}
+    try {
+      for (const f of files) {
+        const id = 'ph_' + uid()
+        const url = await shrinkImage(f)
+        await storage.savePhoto(pid, id, url)
+        added[id] = url
+      }
+    } catch (e) {
+      get().showToast(e instanceof Error ? e.message : 'Foto konnte nicht geladen werden')
+    }
+    const ids = Object.keys(added)
+    if (!ids.length) return
+    set((s) => ({ photos: { ...s.photos, ...added } }))
+    get().edit((p) => {
+      const notes = (p.notes ??= {})
+      const n = notes[elId] ?? { text: '', photos: [] }
+      n.photos.push(...ids)
+      notes[elId] = n
+    })
+  },
+
+  removePhoto: (elId, photoId) => {
+    get().edit((p) => {
+      const n = p.notes?.[elId]
+      if (!n) return
+      n.photos = n.photos.filter((x) => x !== photoId)
+      if (!n.text && !n.photos.length) delete p.notes![elId]
+    })
+    // das Foto selbst bleibt für Rückgängig noch in der Datenbank erhalten
+  },
+
+  refreshBackup: async () => {
+    const h = await bk.getFolder()
+    const state = await bk.folderState(h)
+    set((s) => ({ backup: { ...s.backup, name: h?.name ?? '', state } }))
+  },
+
+  setBackupFolder: async () => {
+    const h = await bk.chooseFolder()
+    if (!h) return
+    await get().refreshBackup()
+    await get().backupNow()
+  },
+
+  grantBackup: async () => {
+    const h = await bk.getFolder()
+    if (h && (await bk.grantFolder(h))) {
+      await get().refreshBackup()
+      await get().backupNow()
+    }
+  },
+
+  disableBackup: async () => {
+    await bk.clearFolder()
+    set({ backup: { name: '', state: 'off', at: null } })
+  },
+
+  backupNow: async () => {
+    const h = await bk.getFolder()
+    if (!h || (await bk.folderState(h)) !== 'ok') {
+      await get().refreshBackup()
+      return false
+    }
+    try {
+      const { project, backgrounds, photos } = get()
+      const at = await bk.writeBackup(h, project, backgrounds, photos)
+      set((s) => ({ backup: { ...s.backup, state: 'ok', at } }))
+      return true
+    } catch (e) {
+      console.warn('Sicherung fehlgeschlagen', e)
+      set((s) => ({ backup: { ...s.backup, state: 'error' } }))
+      return false
+    }
+  },
+
   openProject: async (id) => {
     const p = await storage.loadProject(id)
     if (!p) return
@@ -447,6 +550,13 @@ export const useStore = create<State>((set, get) => ({
       const mk = await storage.loadBackground(p.id, f.id + '~mask')
       if (mk) backgrounds[f.id + '~mask'] = mk
     }
+    const photos: Record<string, string> = {}
+    for (const n of Object.values(p.notes ?? {})) {
+      for (const pid of n.photos) {
+        const ph = await storage.loadPhoto(p.id, pid)
+        if (ph) photos[pid] = ph
+      }
+    }
     try {
       localStorage.setItem(LAST_KEY, id)
     } catch {
@@ -455,6 +565,7 @@ export const useStore = create<State>((set, get) => ({
     set({
       project: p,
       backgrounds,
+      photos,
       activeFloorId: p.floors[0].id,
       selection: null,
       tool: 'select',
@@ -498,7 +609,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   importProjectText: async (text) => {
-    const { project, backgrounds } = storage.parseImport(text)
+    const { project, backgrounds, photos } = storage.parseImport(text)
     // neue IDs vermeiden Kollisionen mit vorhandenen Projekten
     const exists = get().metas.some((m) => m.id === project.id)
     const p: Project = exists ? { ...project, id: project.id + '_i' + Date.now().toString(36), name: project.name + ' (Import)' } : project
@@ -507,6 +618,7 @@ export const useStore = create<State>((set, get) => ({
       if (backgrounds[f.id]) await storage.saveBackground(p.id, f.id, backgrounds[f.id])
       if (backgrounds[f.id + '~mask']) await storage.saveBackground(p.id, f.id + '~mask', backgrounds[f.id + '~mask'])
     }
+    for (const [id, url] of Object.entries(photos)) await storage.savePhoto(p.id, id, url)
     set({ metas: await storage.listProjects() })
     await get().openProject(p.id)
   },
@@ -720,6 +832,8 @@ export function useFloor(): Floor {
 let saveTimer: number | undefined
 let lastSnapshot = 0
 const SNAPSHOT_GAP = 10 * 60 * 1000
+let lastBackup = 0
+const BACKUP_GAP = 60 * 1000
 useStore.subscribe((s, prev) => {
   if (!s.ready) return
   if (s.project === prev.project || s.project.id !== prev.project.id) return
@@ -728,6 +842,11 @@ useStore.subscribe((s, prev) => {
     const proj = useStore.getState().project
     await storage.saveProject(proj)
     useStore.setState({ metas: await storage.listProjects() })
+    // Dateisicherung höchstens einmal pro Minute
+    if (useStore.getState().backup.state === 'ok' && Date.now() - lastBackup > BACKUP_GAP) {
+      lastBackup = Date.now()
+      void useStore.getState().backupNow()
+    }
     // Version höchstens alle 10 Minuten (spart den Datenbankzugriff bei jeder Änderung)
     if (Date.now() - lastSnapshot > SNAPSHOT_GAP) {
       lastSnapshot = Date.now()

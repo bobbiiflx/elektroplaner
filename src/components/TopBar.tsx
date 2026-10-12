@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, History, HardHat, Download, ArrowDownToLine, ArrowUpToLine, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, History, HardHat, HardDrive, Download, ArrowDownToLine, ArrowUpToLine, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
+import { backupSupported, getFolder, listBackups, type BackupFile } from '../lib/backup'
 import { exportJson, addSnapshot, listSnapshots, type Snapshot } from '../lib/storage'
 import { UNITS } from '../lib/units'
 import { useStore } from '../store'
@@ -63,11 +64,113 @@ function VersionsDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
+function BackupDialog({ onClose }: { onClose: () => void }) {
+  const backup = useStore((s) => s.backup)
+  const setFolder = useStore((s) => s.setBackupFolder)
+  const grant = useStore((s) => s.grantBackup)
+  const disable = useStore((s) => s.disableBackup)
+  const now = useStore((s) => s.backupNow)
+  const importText = useStore((s) => s.importProjectText)
+  const showToast = useStore((s) => s.showToast)
+  const [files, setFiles] = useState<BackupFile[] | null>(null)
+  const supported = backupSupported()
+  useEffect(() => {
+    if (backup.state !== 'ok') return
+    void (async () => {
+      const h = await getFolder()
+      if (h) setFiles(await listBackups(h))
+    })()
+  }, [backup.state, backup.at])
+  const label = { off: 'Aus', ok: 'Aktiv', 'needs-permission': 'Zugriff erneut erlauben', error: 'Fehler beim Schreiben' }[backup.state]
+  return (
+    <Modal title="Datensicherung" onClose={onClose} width={480}>
+      {!supported ? (
+        <p className="muted">Dieser Browser kann nicht selbstständig in einen Ordner schreiben. Mit Chrome oder Edge geht es; sonst bitte regelmäßig „Exportieren (JSON)“ nutzen.</p>
+      ) : (
+        <>
+          <p className="muted small">
+            Der Planer schreibt bei jeder Änderung (höchstens einmal pro Minute) eine Datei in einen Ordner deiner Wahl, z. B. in OneDrive oder iCloud. So geht nichts verloren, wenn Browserdaten gelöscht werden.
+          </p>
+          <div className="menu-item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div>{backup.name ? `Ordner: ${backup.name}` : 'Kein Ordner gewählt'}</div>
+              <div className="muted small">
+                {label}
+                {backup.at && backup.state === 'ok' ? ` · zuletzt ${new Date(backup.at).toLocaleTimeString('de-DE', { timeStyle: 'short' })}` : ''}
+              </div>
+            </div>
+            {backup.state === 'needs-permission' && (
+              <button className="btn small primary" onClick={() => void grant()}>
+                Erlauben
+              </button>
+            )}
+            {backup.state === 'ok' && (
+              <button
+                className="btn small"
+                onClick={async () => {
+                  showToast((await now()) ? 'Gesichert.' : 'Sicherung fehlgeschlagen.')
+                }}
+              >
+                Jetzt sichern
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button className="btn" onClick={() => void setFolder()}>
+              {backup.name ? 'Ordner wechseln …' : 'Ordner wählen …'}
+            </button>
+            {backup.name && (
+              <button className="btn" onClick={() => void disable()}>
+                Ausschalten
+              </button>
+            )}
+          </div>
+          {backup.state === 'ok' && files && (
+            <>
+              <h4 style={{ margin: '16px 0 6px' }}>Sicherungen im Ordner</h4>
+              {!files.length && <p className="muted small">Noch keine Datei.</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflow: 'auto' }}>
+                {files.map((f) => (
+                  <div key={f.name} className="menu-item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name.replace('.elektroplaner.json', '')}</div>
+                      <div className="muted small">
+                        {new Date(f.modified).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} · {Math.round(f.size / 1024)} KB
+                      </div>
+                    </div>
+                    <button
+                      className="btn small"
+                      onClick={async () => {
+                        try {
+                          await importText(await f.file.text())
+                          showToast('Als neues Projekt geladen.')
+                          onClose()
+                        } catch (e) {
+                          showToast(e instanceof Error ? e.message : 'Laden fehlgeschlagen')
+                        }
+                      }}
+                    >
+                      Laden
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Modal>
+  )
+}
+
 function ProjectMenu() {
   const [versions, setVersions] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
+  const backupState = useStore((s) => s.backup.state)
   const project = useStore((s) => s.project)
   const metas = useStore((s) => s.metas)
   const backgrounds = useStore((s) => s.backgrounds)
+  const photos = useStore((s) => s.photos)
   const openProject = useStore((s) => s.openProject)
   const createProject = useStore((s) => s.createProject)
   const removeProject = useStore((s) => s.removeProject)
@@ -92,6 +195,7 @@ function ProjectMenu() {
 
   return (
     <div className="menu-wrap" ref={ref}>
+      {backupOpen && createPortal(<BackupDialog onClose={() => setBackupOpen(false)} />, document.body)}
       {versions && createPortal(<VersionsDialog onClose={() => setVersions(false)} />, document.body)}
       <button className="project-btn" onClick={() => setOpen((o) => !o)}>
         <span className="project-name">{project.name}</span>
@@ -173,7 +277,7 @@ function ProjectMenu() {
             className="menu-action"
             onClick={() => {
               const safe = project.name.replace(/[^\w\-äöüÄÖÜß ]+/g, '_').trim() || 'projekt'
-              downloadText(`${safe}.elektroplaner.json`, exportJson(project, backgrounds))
+              downloadText(`${safe}.elektroplaner.json`, exportJson(project, backgrounds, photos))
               setOpen(false)
             }}
           >
@@ -203,6 +307,15 @@ function ProjectMenu() {
             }}
           >
             <History size={15} /> Versionen …
+          </button>
+          <button
+            className="menu-action"
+            onClick={() => {
+              setOpen(false)
+              setBackupOpen(true)
+            }}
+          >
+            <HardDrive size={15} /> Datensicherung …{backupState === 'needs-permission' || backupState === 'error' ? ' ⚠' : ''}
           </button>
         </div>
       )}

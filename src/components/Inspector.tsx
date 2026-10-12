@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import NoteSection from './NoteSection'
 import { AlertTriangle, CheckCircle2, Hammer, Trash2 } from 'lucide-react'
 import {
   CABLE_TYPES,
@@ -139,6 +140,7 @@ export default function Inspector() {
     <div className="inspector-body">
       <InspectorTabs />
       {body}
+      {selection && <NoteSection elId={selection.id} />}
       <div className="section">
         <button className="btn danger block" onClick={deleteSelection}>
           <Trash2 size={15} /> Löschen

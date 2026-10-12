@@ -242,7 +242,13 @@ export interface Project {
   material?: { endMm: number; wastePct: number } // Leitungszuschlag je Ende (mm) und Verschnitt (%)
   roomReq?: Partial<Record<RoomType, { sockets: number; lights: number }>> // eigene Soll-Werte je Raumart
   done?: Record<string, boolean> // Baustellen-Modus: erledigte Geräte/Leitungen (Element-ID)
+  notes?: Record<string, Note> // Notizen und Fotos je Element-ID
   variants?: Variant[] // gemerkte Materialstände zum Vergleichen (z. B. KNX gegen konventionell)
+}
+/** Notiz mit Fotos an einem Element (Wand, Gerät, Leitung …). Fotos liegen separat in der Datenbank. */
+export interface Note {
+  text: string
+  photos: string[]
 }
 export interface Variant {
   id: string

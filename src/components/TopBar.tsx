@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, History, Download, ArrowDownToLine, ArrowUpToLine, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, History, HardHat, Download, ArrowDownToLine, ArrowUpToLine, Eye, FileOutput, FolderOpen, ImageUp, Image as ImageIcon, Monitor, Moon, Pencil, Plus, Printer, Redo2, Ruler, Settings2, Sun, Table2, Trash2, Undo2 } from 'lucide-react'
 import { downloadText, pickFile } from '../lib/files'
 import { exportJson, addSnapshot, listSnapshots, type Snapshot } from '../lib/storage'
 import { UNITS } from '../lib/units'
@@ -335,6 +335,15 @@ function OutputMenu() {
             }}
           >
             <Printer size={15} /> Druckansicht (Pläne, Maße, Checklisten)
+          </button>
+          <button
+            className="menu-action"
+            onClick={() => {
+              setOpen(false)
+              useStore.getState().setSiteMode(true)
+            }}
+          >
+            <HardHat size={15} /> Baustellen-Modus (abhaken)
           </button>
           <button
             className="menu-action"

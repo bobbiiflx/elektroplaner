@@ -127,6 +127,9 @@ interface State {
   addGroup: (partial?: Partial<Group>) => string
   addScene: () => string
   setPrintOpen: (v: boolean, lists?: boolean) => void
+  siteMode: boolean
+  setSiteMode: (v: boolean) => void
+  toggleDone: (id: string) => void
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
   showToast: (msg: string) => void
@@ -402,6 +405,14 @@ export const useStore = create<State>((set, get) => ({
     return id
   },
   setPrintOpen: (printOpen, lists) => set({ printOpen, printLists: !!lists }),
+  siteMode: false,
+  setSiteMode: (siteMode) => set({ siteMode }),
+  toggleDone: (id) =>
+    get().edit((p) => {
+      p.done = p.done ?? {}
+      if (p.done[id]) delete p.done[id]
+      else p.done[id] = true
+    }),
   toggleAllFloors: () => set((s) => ({ showAllFloors: !s.showAllFloors })),
   toggleGhostWalls: () => set((s) => ({ ghostWalls: !s.ghostWalls })),
   openImport: (importFile) => set({ importFile }),

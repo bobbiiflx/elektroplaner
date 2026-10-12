@@ -231,6 +231,7 @@ export interface Project {
   cabinet?: { rowTE: number; reservePct: number } // Schaltschrank-Belegung
   suppliers?: Record<string, string> // Händler je Material-Position (Schlüssel wie bei prices)
   material?: { endMm: number; wastePct: number } // Leitungszuschlag je Ende (mm) und Verschnitt (%)
+  done?: Record<string, boolean> // Baustellen-Modus: erledigte Geräte/Leitungen (Element-ID)
   variants?: Variant[] // gemerkte Materialstände zum Vergleichen (z. B. KNX gegen konventionell)
 }
 export interface Variant {

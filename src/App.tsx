@@ -9,6 +9,7 @@ import SchrankDialog from './components/SchrankDialog'
 import ToolRail, { TOOLS } from './components/ToolRail'
 import TopBar from './components/TopBar'
 import WallElevation from './components/WallElevation'
+import SiteView from './components/SiteView'
 const PrintView = lazy(() => import('./components/PrintView'))
 import { useStore } from './store'
 
@@ -25,6 +26,7 @@ export default function App() {
   const viewMode = useStore((s) => s.viewMode)
   const planPane = useStore((s) => s.planPane)
   const printOpen = useStore((s) => s.printOpen)
+  const siteMode = useStore((s) => s.siteMode)
 
   useEffect(() => {
     void useStore.getState().init()
@@ -87,6 +89,8 @@ export default function App() {
         <PrintView />
       </Suspense>
     )
+
+  if (siteMode) return <SiteView />
 
   return (
     <div className="app">

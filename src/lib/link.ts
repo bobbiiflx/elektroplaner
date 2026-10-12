@@ -52,8 +52,9 @@ export function syncDeviceNodes(f: Floor, deviceId: string) {
   const dv = f.devices.find((d) => d.id === deviceId)
   if (!dv) return
   const w = f.walls.find((x) => x.id === dv.wallId)
-  if (!w) return
-  const pos = pointOnWall(w, dv.offset)
+  // Wandgeräte folgen der Wand, frei montierte Geräte (Decke/Boden) liegen auf x/y
+  const pos = w ? pointOnWall(w, dv.offset) : dv.x !== undefined && dv.y !== undefined ? { x: dv.x, y: dv.y } : null
+  if (!pos) return
   for (const c of f.cables) {
     for (let i = 0; i < c.points.length; i++) {
       const n = c.points[i]

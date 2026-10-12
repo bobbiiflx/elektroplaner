@@ -3,6 +3,7 @@ import { produce, type Draft } from 'immer'
 import type {
   Background,
   CableNode,
+  Circuit,
   Floor,
   OpeningType,
   Project,
@@ -11,7 +12,8 @@ import type {
   WallKind,
 } from './types'
 import { newFloor, newProject, sampleProject } from './lib/factory'
-import { cableType, type DeviceSpec } from './config/catalog'
+import { CIRCUIT_COLORS, cableType, type DeviceSpec } from './config/catalog'
+import type { ColorBy } from './lib/completeness'
 import { uid } from './lib/geom'
 import * as storage from './lib/storage'
 
@@ -42,6 +44,7 @@ export interface ToolOptions {
   ortho: boolean
   snap: boolean // Lineal: am Raster / an Objektmitten einrasten
   spec: DeviceSpec // gewählte Serie / Größe / Dose für neu gesetzte Geräte
+  circuitId?: string // aktiver Stromkreis: neue Geräte werden ihm zugewiesen
 }
 
 interface State {
@@ -57,6 +60,7 @@ interface State {
   viewMode: ViewMode
   showZones: boolean
   showDims: boolean
+  colorBy: ColorBy
   printOpen: boolean
   showAllFloors: boolean
   ghostWalls: boolean
@@ -84,6 +88,8 @@ interface State {
   setViewMode: (v: ViewMode) => void
   toggleZones: () => void
   toggleDims: () => void
+  setColorBy: (c: ColorBy) => void
+  addCircuit: (partial?: Partial<Circuit>) => string
   setPrintOpen: (v: boolean) => void
   toggleAllFloors: () => void
   toggleGhostWalls: () => void
@@ -140,6 +146,7 @@ export const useStore = create<State>((set, get) => ({
   viewMode: 'split',
   showZones: false,
   showDims: true,
+  colorBy: 'type',
   printOpen: false,
   showAllFloors: false,
   ghostWalls: false,
@@ -212,6 +219,25 @@ export const useStore = create<State>((set, get) => ({
   setViewMode: (viewMode) => set({ viewMode }),
   toggleZones: () => set((s) => ({ showZones: !s.showZones })),
   toggleDims: () => set((s) => ({ showDims: !s.showDims })),
+  setColorBy: (colorBy) => set({ colorBy }),
+  addCircuit: (partial) => {
+    const id = uid('c_')
+    get().edit((p) => {
+      p.circuits = p.circuits ?? []
+      const n = p.circuits.length
+      p.circuits.push({
+        id,
+        name: `Stromkreis ${n + 1}`,
+        rating: 16,
+        charac: 'B',
+        phase: (['L1', 'L2', 'L3'] as const)[n % 3],
+        rcd: 'FI 1 · 30 mA',
+        color: CIRCUIT_COLORS[n % CIRCUIT_COLORS.length],
+        ...partial,
+      })
+    })
+    return id
+  },
   setPrintOpen: (printOpen) => set({ printOpen }),
   toggleAllFloors: () => set((s) => ({ showAllFloors: !s.showAllFloors })),
   toggleGhostWalls: () => set((s) => ({ ghostWalls: !s.ghostWalls })),

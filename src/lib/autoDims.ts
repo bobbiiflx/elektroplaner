@@ -23,7 +23,8 @@ export function autoRef(wall: Wall, devices: Device[], u: number, z: number, ign
 /** Mittenpunkt eines Geräts auf der Wandachse im Grundriss. */
 export function deviceCenter(floor: Floor, d: Device): Vec2 | null {
   const w = floor.walls.find((x) => x.id === d.wallId)
-  return w ? pointOnWall(w, d.offset) : null
+  if (w) return pointOnWall(w, d.offset)
+  return d.x !== undefined && d.y !== undefined ? { x: d.x, y: d.y } : null
 }
 
 export interface SnapResult {
@@ -45,7 +46,10 @@ export function snapPlanPoint(floor: Floor, raw: Vec2, tol: number, grid: number
   }
   for (const d of floor.devices) {
     const w = floor.walls.find((x) => x.id === d.wallId)
-    if (!w) continue
+    if (!w) {
+      if (d.x !== undefined && d.y !== undefined) consider({ x: d.x, y: d.y }, 'device')
+      continue
+    }
     const L = wallLength(w) || 1
     const nx = -(w.b.y - w.a.y) / L
     const ny = (w.b.x - w.a.x) / L

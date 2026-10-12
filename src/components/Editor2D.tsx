@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, type DeviceCategory } from '../config/catalog'
+import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Vec2, Wall } from '../types'
 import {
@@ -18,6 +18,7 @@ import {
 import { findJoined, moveEnds, syncDeviceNodes, type WallEnd } from '../lib/link'
 import { formatLen } from '../lib/units'
 import { Dim, FreeDim, PlanDims } from './dims'
+import { fillFor, missingFor } from '../lib/completeness'
 import { autoRef, lockAxis, snapPlanPoint } from '../lib/autoDims'
 import { LenField } from './NumberField'
 import { routeTo } from '../lib/cableRoute'
@@ -61,6 +62,7 @@ export default function Editor2D() {
   const opts = useStore((s) => s.opts)
   const unit = useStore((s) => s.unit)
   const showDims = useStore((s) => s.showDims)
+  const colorBy = useStore((s) => s.colorBy)
   const edit = useStore((s) => s.edit)
   const select = useStore((s) => s.select)
   const setTool = useStore((s) => s.setTool)
@@ -286,10 +288,16 @@ export default function Editor2D() {
     return { p, kind: 'grid' }
   }
 
-  const devicePos = (f: Floor, id: string): { face: Vec2; center: Vec2; wall: Wall } | null => {
+  const devicePos = (f: Floor, id: string): { face: Vec2; center: Vec2; wall: Wall | null } | null => {
     const d = f.devices.find((x) => x.id === id)
-    const w = d && f.walls.find((x) => x.id === d.wallId)
-    if (!d || !w) return null
+    if (!d) return null
+    const w = f.walls.find((x) => x.id === d.wallId)
+    if (!w) {
+      // frei montiert (Decke / Boden)
+      if (d.x === undefined || d.y === undefined) return null
+      const q = { x: d.x, y: d.y }
+      return { face: q, center: q, wall: null }
+    }
     return {
       face: pointOnWall(w, d.offset, d.side, w.thickness / 2),
       center: pointOnWall(w, d.offset),
@@ -340,6 +348,20 @@ export default function Editor2D() {
   }
 
   const placeDevice = (raw: Vec2) => {
+    const dt0 = deviceType(opts.deviceTypeId)
+    if (dt0.mount && dt0.mount !== 'wall') {
+      // Decken- bzw. Bodenmontage: freie Position im Raum, am Raster ausgerichtet
+      const g = settings.grid
+      const q = { x: Math.round(raw.x / g) * g, y: Math.round(raw.y / g) * g }
+      const id = uid('d_')
+      const height = dt0.mount === 'ceiling' ? floor.wallHeight - (dt0.ceilingDrop ?? 0) : dt0.defaultHeight
+      edit((p) => {
+        const f = p.floors.find((x) => x.id === floor.id)
+        f?.devices.push({ id, typeId: dt0.id, wallId: '', offset: 0, side: 1, height, x: q.x, y: q.y, ...electricDefaults(dt0), ...(opts.circuitId ? { circuitId: opts.circuitId } : {}), ...opts.spec })
+      })
+      select({ kind: 'device', id })
+      return
+    }
     const hit = nearestWall(floor.walls, raw, 400)
     if (!hit) {
       showToast('Zum Platzieren auf eine Wand klicken.')
@@ -356,6 +378,8 @@ export default function Editor2D() {
         offset: hit.t,
         side: hit.signed >= 0 ? 1 : -1,
         height: dt.defaultHeight,
+        ...electricDefaults(dt),
+        ...(opts.circuitId ? { circuitId: opts.circuitId } : {}),
         ...opts.spec,
       })
     })
@@ -509,6 +533,19 @@ export default function Editor2D() {
       return
     }
     if (d.kind === 'device') {
+      const cur = floor.devices.find((x) => x.id === d.id)
+      if (cur && !cur.wallId) {
+        const g = settings.grid
+        edit((p) => {
+          const f = p.floors.find((x) => x.id === floor.id)
+          const dv = f?.devices.find((x) => x.id === d.id)
+          if (!f || !dv) return
+          dv.x = Math.round(raw.x / g) * g
+          dv.y = Math.round(raw.y / g) * g
+          syncDeviceNodes(f, dv.id)
+        }, `dev:${d.id}`)
+        return
+      }
       const hit = nearestWall(floor.walls, raw, 700)
       if (!hit) return
       edit((p) => {
@@ -814,6 +851,7 @@ export default function Editor2D() {
             const dt = deviceType(d.typeId)
             const sel = selection?.kind === 'device' && selection.id === d.id
             const r = Math.max(65, px(7.5))
+            const open = colorBy !== 'type' && missingFor(d, dt).length > 0
             return (
               <g
                 key={d.id}
@@ -821,7 +859,8 @@ export default function Editor2D() {
                 style={{ cursor: tool === 'select' ? 'pointer' : undefined }}
                 onPointerDown={(e) => beginElementDrag(e, { kind: 'device', id: d.id }, { kind: 'device', id: d.id })}
               >
-                {shape(dt.category, r, dt.color, sel)}
+                {open && <circle r={r * 1.55} fill="none" stroke="var(--warn)" strokeWidth={px(1.8)} strokeDasharray={`${px(4)} ${px(3)}`} />}
+                {shape(dt.category, r, fillFor(d, dt, project, colorBy), sel)}
                 {sel && label(`${dt.name} · ${formatLen(d.height, unit)}`, 0, -r - px(12))}
               </g>
             )
@@ -885,7 +924,20 @@ export default function Editor2D() {
               </g>
             )
           })()}
-          {ghost && tool === 'device' && (() => {
+          {tool === 'device' && cursor && (() => {
+            const dt = deviceType(opts.deviceTypeId)
+            if (!dt.mount || dt.mount === 'wall') return null
+            const g = settings.grid
+            const q = { x: Math.round(cursor.x / g) * g, y: Math.round(cursor.y / g) * g }
+            const r = Math.max(65, px(7.5))
+            return (
+              <g transform={`translate(${q.x} ${q.y})`} opacity={0.6} style={{ pointerEvents: 'none' }}>
+                {shape(dt.category, r, dt.color, false)}
+                {label(dt.mount === 'ceiling' ? `Decke · ${formatLen(floor.wallHeight - (dt.ceilingDrop ?? 0), unit)}` : `Boden · ${formatLen(dt.defaultHeight, unit)}`, 0, -r - px(11))}
+              </g>
+            )
+          })()}
+          {ghost && tool === 'device' && deviceType(opts.deviceTypeId).mount !== 'ceiling' && deviceType(opts.deviceTypeId).mount !== 'floor' && (() => {
             const dt = deviceType(opts.deviceTypeId)
             const side = ghost.signed >= 0 ? 1 : -1
             const pos = pointOnWall(ghost.wall, ghost.t, side, ghost.wall.thickness / 2)

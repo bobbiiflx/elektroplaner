@@ -26,7 +26,18 @@
   "poe.png": "5. Blatt e10",
   "kab-aus.png": "5. Blatt e11",
   "cam.png": "aus Archiv",
-  "nfc.png": "aus Archiv"
+  "nfc.png": "aus Archiv",
+  "l-kron.png": "6. Blatt (Leuchten) l03",
+  "l-pendel.png": "6. Blatt (Leuchten) l04",
+  "l-spot.png": "6. Blatt (Leuchten) l05",
+  "l-wand.png": "6. Blatt (Leuchten) l06",
+  "l-aussen.png": "6. Blatt (Leuchten) l07",
+  "l-schiene.png": "6. Blatt (Leuchten) l08",
+  "l-band.png": "6. Blatt (Leuchten) l10",
+  "l-bild.png": "6. Blatt (Leuchten) l11",
+  "l-vent.png": "6. Blatt (Leuchten) l12",
+  "l-rgb.png": "6. Blatt (Leuchten) l14",
+  "l-not.png": "6. Blatt (Leuchten) l15"
  },
  "unused": {
   "steckdose-1fach-foto.png": "steckdose-1fach-foto (Duplikat zu sd-1)",
@@ -79,6 +90,11 @@
   "steckdosenleiste-4fach-schalter.png": "5. Blatt e13",
   "gluehbirne.png": "5. Blatt e14",
   "thermo-hygrometer.png": "5. Blatt e15",
-  "erdungsleitung-rolle.png": "5. Blatt e16"
+  "erdungsleitung-rolle.png": "5. Blatt e16",
+  "tischleuchte.png": "6. Blatt (Leuchten) l01 – mobile Leuchte, kein Installationsobjekt",
+  "bogenstehleuchte.png": "6. Blatt (Leuchten) l02 – mobile Leuchte, kein Installationsobjekt",
+  "arbeitsleuchte-gelenkarm.png": "6. Blatt (Leuchten) l09 – mobile Leuchte, kein Installationsobjekt",
+  "leselampe-klemmleuchte.png": "6. Blatt (Leuchten) l13 – mobile Leuchte, kein Installationsobjekt",
+  "werkstatt-handlampe.png": "6. Blatt (Leuchten) l16 – mobile Leuchte, kein Installationsobjekt"
  }
 }

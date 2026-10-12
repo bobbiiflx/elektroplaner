@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
-import { DOOR_DEFAULT, WINDOW_DEFAULT, cableType, deviceType, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
+import { DOOR_DEFAULT, WINDOW_DEFAULT, electricDefaults, cableType, deviceType, deviceType as deviceTypeById, devType, resolveDevice, resolveSpec, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { CableNode, Floor, Wall } from '../types'
 import { clamp, pointOnWall, projectOnWall, uid, wallLength } from '../lib/geom'
 import { routeTo } from '../lib/cableRoute'
 import { autoRef, lockAxis, snapWallPoint, type AutoRef } from '../lib/autoDims'
+import { fillFor, missingFor } from '../lib/completeness'
 import { syncDeviceNodes } from '../lib/link'
 import { horizontalBands, verticalSpans } from '../lib/zones'
 import { formatLen } from '../lib/units'
@@ -55,6 +56,7 @@ export default function WallElevation() {
   const unit = useStore((s) => s.unit)
   const showZones = useStore((s) => s.showZones)
   const showDims = useStore((s) => s.showDims)
+  const colorBy = useStore((s) => s.colorBy)
   const edit = useStore((s) => s.edit)
   const select = useStore((s) => s.select)
   const setTool = useStore((s) => s.setTool)
@@ -264,12 +266,17 @@ export default function WallElevation() {
 
   const placeDevice = (rawU: number, rawZ: number) => {
     if (!wall) return
+    const mt = deviceTypeById(opts.deviceTypeId).mount
+    if (mt && mt !== 'wall') {
+      showToast('Decken- und Bodenleuchten werden im Grundriss gesetzt.')
+      return
+    }
     const dt = resolveSpec(opts.deviceTypeId, opts.spec, settings.seriesId).dt
     const r = snapFree(rawU, rawZ)
     const id = uid('d_')
     edit((p) => {
       const f = p.floors.find((x) => x.id === floor.id)
-      f?.devices.push({ id, typeId: dt.id, wallId: wall.id, offset: r.u, side, height: r.z, ...opts.spec })
+      f?.devices.push({ id, typeId: dt.id, wallId: wall.id, offset: r.u, side, height: r.z, ...electricDefaults(dt), ...(opts.circuitId ? { circuitId: opts.circuitId } : {}), ...opts.spec })
     })
     select({ kind: 'device', id })
   }
@@ -549,7 +556,7 @@ export default function WallElevation() {
     if (!last) return [target.node]
     return [last, ...routeTo(last, target.node, floor.walls)]
   })()
-  const ghostDev = tool === 'device' && cursor ? snapFree(cursor.u, cursor.z) : null
+  const ghostDev = tool === 'device' && cursor && (!deviceType(opts.deviceTypeId).mount || deviceType(opts.deviceTypeId).mount === 'wall') ? snapFree(cursor.u, cursor.z) : null
   const ghostOpen =
     tool === 'opening' && cursor
       ? (() => {
@@ -711,6 +718,12 @@ export default function WallElevation() {
               >
                 <rect x={-dt.w / 2 - 12} y={-dt.h / 2 - 12} width={dt.w + 24} height={dt.h + 24} fill="transparent" />
                 <DeviceFace dt={dt} />
+                {colorBy !== 'type' && (
+                  <g transform={`translate(${dt.w / 2} ${-dt.h / 2})`}>
+                    <circle r={px(5) / k} fill={fillFor(d, dt, project, colorBy)} stroke="var(--paper)" strokeWidth={px(1.4) / k} />
+                    {missingFor(d, dt).length > 0 && <circle r={px(8) / k} fill="none" stroke="var(--warn)" strokeWidth={px(1.5) / k} strokeDasharray={`${px(3) / k} ${px(2.5) / k}`} />}
+                  </g>
+                )}
                 {sel && <rect x={-dt.w / 2 - 8} y={-dt.h / 2 - 8} width={dt.w + 16} height={dt.h + 16} rx={12} fill="none" stroke="var(--accent)" strokeWidth={px(2.5) / k} />}
                 {!front && <rect x={-dt.w / 2} y={-dt.h / 2} width={dt.w} height={dt.h} fill="none" stroke="var(--ink-soft)" strokeDasharray={`${px(4) / k} ${px(3) / k}`} strokeWidth={px(1) / k} />}
               </g>

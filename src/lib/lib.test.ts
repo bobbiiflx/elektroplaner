@@ -184,3 +184,14 @@ describe('Schalterserien und Dosen', () => {
     expect(devType({ id: 'x', typeId: 'sw-1', wallId: 'w', offset: 0, side: 1, height: 0 }, { seriesId: 'bj-reflex' } as never).w).toBe(81)
   })
 })
+
+import { missingFor } from './completeness'
+import { deviceType, electricDefaults } from '../config/catalog'
+describe('completeness', () => {
+  it('Leuchte ohne Stromkreis meldet fehlende Angaben, Schalter nicht', () => {
+    const dt = deviceType('l-spot')
+    const d = { id: 'x', typeId: 'l-spot', wallId: '', offset: 0, side: 1 as const, height: 2500, ...electricDefaults(dt) }
+    expect(missingFor(d, dt)).toContain('circuit')
+    expect(missingFor({ ...d, circuitId: 'c1' }, dt)).not.toContain('circuit')
+  })
+})

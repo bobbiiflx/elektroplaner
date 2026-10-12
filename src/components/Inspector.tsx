@@ -22,6 +22,7 @@ import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } fr
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
 import { SpecFields } from './SpecFields'
+import { ElectricFields, ElectricOverview } from './ElectricPanel'
 
 export default function Inspector() {
   const floor = useFloor()
@@ -242,25 +243,41 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
             ))}
           </select>
         </Row>
-        <Row label="Höhe" hint="Mitte über OKFF">
-          <LenField mm={device.height} min={0} onCommit={(v) => upd((d) => void (d.height = v), key('h'))} />
-        </Row>
-        <Row label="Abstand Wandanfang" hint="bis Mitte">
-          <LenField mm={device.offset} min={0} max={L} onCommit={(v) => upd((d) => void (d.offset = v), key('o'))} />
-        </Row>
-        <Row label="Abstand Wandende" hint="bis Mitte">
-          <LenField mm={Math.max(0, L - device.offset)} min={0} onCommit={(v) => upd((d) => void (d.offset = clamp(L - v, 0, L)), key('o'))} />
-        </Row>
-        <Row label="Wandseite">
-          <Segmented
-            value={device.side === 1 ? 'a' : 'b'}
-            onChange={(v) => upd((d) => void (d.side = v === 'a' ? 1 : -1))}
-            options={[
-              { value: 'a', label: 'Seite A' },
-              { value: 'b', label: 'Seite B' },
-            ]}
-          />
-        </Row>
+        {wall ? (
+          <>
+            <Row label="Höhe" hint="Mitte über OKFF">
+              <LenField mm={device.height} min={0} onCommit={(v) => upd((d) => void (d.height = v), key('h'))} />
+            </Row>
+            <Row label="Abstand Wandanfang" hint="bis Mitte">
+              <LenField mm={device.offset} min={0} max={L} onCommit={(v) => upd((d) => void (d.offset = v), key('o'))} />
+            </Row>
+            <Row label="Abstand Wandende" hint="bis Mitte">
+              <LenField mm={Math.max(0, L - device.offset)} min={0} onCommit={(v) => upd((d) => void (d.offset = clamp(L - v, 0, L)), key('o'))} />
+            </Row>
+            <Row label="Wandseite">
+              <Segmented
+                value={device.side === 1 ? 'a' : 'b'}
+                onChange={(v) => upd((d) => void (d.side = v === 'a' ? 1 : -1))}
+                options={[
+                  { value: 'a', label: 'Seite A' },
+                  { value: 'b', label: 'Seite B' },
+                ]}
+              />
+            </Row>
+          </>
+        ) : (
+          <>
+            <Row label="Position X">
+              <LenField mm={device.x ?? 0} onCommit={(v) => upd((d) => void (d.x = v), key('x'))} />
+            </Row>
+            <Row label="Position Y">
+              <LenField mm={device.y ?? 0} onCommit={(v) => upd((d) => void (d.y = v), key('y'))} />
+            </Row>
+            <Row label="Einbauhöhe" hint="Mitte über OKFF">
+              <LenField mm={device.height} min={0} onCommit={(v) => upd((d) => void (d.height = v), key('h'))} />
+            </Row>
+          </>
+        )}
         <SpecFields
           typeId={device.typeId}
           spec={device}
@@ -281,6 +298,8 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
           </p>
         )}
       </Section>
+      <ElectricFields device={device} />
+      {wall && (
       <Section title="Installationszone">
         {zone.ok ? (
           <p className="status-line ok">
@@ -295,6 +314,7 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
           {dt.name} · Platte {formatLen(dt.w, 'mm')} × {formatLen(dt.h, 'mm')}
         </p>
       </Section>
+      )}
     </>
   )
 }
@@ -546,6 +566,8 @@ function FloorPanel({ floor }: { floor: Floor }) {
           </>
         )}
       </Section>
+
+      <ElectricOverview floor={floor} />
 
       <Section title="Übersicht">
         <p className="muted small">

@@ -133,7 +133,7 @@ function PlanPage({ floor, opts, unit, areaW, areaH }: { floor: Floor; opts: Opt
 
   const facePos = (d: Device) => {
     const w = floor.walls.find((x) => x.id === d.wallId)
-    if (!w) return null
+    if (!w) return d.x !== undefined && d.y !== undefined ? { x: d.x, y: d.y } : null
     const L = wallLength(w)
     const dx = (w.b.x - w.a.x) / L
     const dy = (w.b.y - w.a.y) / L

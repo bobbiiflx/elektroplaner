@@ -190,17 +190,19 @@ function DeviceMesh({
 }) {
   const settings = useStore((st) => st.project.settings)
   const w = floor.walls.find((x) => x.id === device.wallId)
-  if (!w) return null
   const dt = devType(device, settings)
-  const c = pointOnWall(w, device.offset)
-  const n = wallNormal(w)
-  const off = w.thickness / 2 + dt.d / 2
-  const pos: [number, number, number] = [
-    mm(c.x + n.x * device.side * off),
-    mm(elevation + device.height),
-    mm(c.y + n.y * device.side * off),
-  ]
-  const rotY = (-wallAngleDeg(w) * Math.PI) / 180
+  let pos: [number, number, number]
+  let rotY = 0
+  if (w) {
+    const c = pointOnWall(w, device.offset)
+    const n = wallNormal(w)
+    const off = w.thickness / 2 + dt.d / 2
+    pos = [mm(c.x + n.x * device.side * off), mm(elevation + device.height), mm(c.y + n.y * device.side * off)]
+    rotY = (-wallAngleDeg(w) * Math.PI) / 180
+  } else if (device.x !== undefined && device.y !== undefined) {
+    // frei montiert (Decke / Boden)
+    pos = [mm(device.x), mm(elevation + device.height), mm(device.y)]
+  } else return null
   const k = selected ? 1.15 : 1
   return (
     <mesh

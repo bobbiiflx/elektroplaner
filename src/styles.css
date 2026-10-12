@@ -1086,3 +1086,21 @@ p {
 .spec-ctl.pair .field-num { width: 92px; flex: none }
 .optbar .spec-ctl.pair .field-num { width: 84px }
 .spec-note { grid-column: 1 / -1; margin: 0 0 4px }
+
+/* Elektrik */
+.opt-inline{display:inline-flex;align-items:center;gap:6px}
+.cable-dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.circuit-row{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line,rgba(128,128,128,.25))}
+.circuit-row:first-of-type{border-top:0}
+.circuit-head{display:flex;gap:6px;align-items:center}
+.circuit-head input[type=color]{width:26px;height:26px;padding:0;border:0;background:none;flex:none}
+.circuit-head .text{flex:1;min-width:0}
+.circuit-fields{display:grid;grid-template-columns:1fr 0.7fr 0.9fr 1.3fr;gap:6px}
+.circuit-fields select,.circuit-fields input{min-width:0;width:100%}
+.open-list{display:flex;flex-direction:column;max-height:260px;overflow:auto;margin:6px 0}
+.open-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0}
+.open-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit}
+.bulk-bar{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid var(--line,rgba(128,128,128,.25))}
+.bulk-bar.off{opacity:.55}
+.bulk-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bulk-line select{flex:1;min-width:0}

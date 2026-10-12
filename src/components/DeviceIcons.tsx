@@ -34,6 +34,14 @@ export function PlanSymbolShape({
       return <rect x={-r * 1.6} y={-r} width={r * 3.2} height={2 * r} rx={r * 0.25} fill={fill} stroke={stroke} strokeWidth={sw} />
     case 'iot':
       return <polygon points={`${r * 1.2},0 ${r * 0.6},${r * 1.05} ${-r * 0.6},${r * 1.05} ${-r * 1.2},0 ${-r * 0.6},${-r * 1.05} ${r * 0.6},${-r * 1.05}`} fill={fill} stroke={stroke} strokeWidth={sw} />
+    case 'light':
+      // klassisches Lichtauslass-Zeichen: Kreis mit Kreuz
+      return (
+        <g>
+          <circle r={r * 1.05} fill={fill} stroke={stroke} strokeWidth={sw} />
+          <path d={`M ${-r * 0.62} ${-r * 0.62} L ${r * 0.62} ${r * 0.62} M ${r * 0.62} ${-r * 0.62} L ${-r * 0.62} ${r * 0.62}`} stroke="#1d1d1f" strokeWidth={sw * 1.1} strokeLinecap="round" />
+        </g>
+      )
     case 'box':
       return <rect x={-r * 0.8} y={-r * 0.8} width={r * 1.6} height={r * 1.6} fill="var(--paper)" stroke={fill} strokeWidth={sw * 1.4} />
     default:
@@ -240,6 +248,103 @@ function DeviceFaceBase({ dt }: { dt: DeviceType }) {
           <rect x={-w / 2 + 40} y={-h / 2 + 70} width={w - 80} height={260} rx={18} fill="#1c1c1e" />
           <circle cx={0} cy={-h / 2 + 400} r={60} fill="none" stroke={dt.color} strokeWidth={8} vectorEffect="non-scaling-stroke" />
           <circle cx={0} cy={h / 2 - 280} r={80} fill={FIELD} stroke={SOFT} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'l-spot':
+      return (
+        <g>
+          <circle r={w / 2} fill={PLATE} stroke={SOFT} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+          <circle r={w * 0.33} fill="#fff7d6" stroke={dt.color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'l-pendel':
+      return (
+        <g>
+          <line x1={0} y1={-h / 2} x2={0} y2={-h * 0.12} stroke={INK} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          <path d={`M ${-w * 0.22} ${-h * 0.12} L ${w * 0.22} ${-h * 0.12} L ${w * 0.5} ${h * 0.4} L ${-w * 0.5} ${h * 0.4} Z`} fill="#b08d57" stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <ellipse cx={0} cy={h * 0.4} rx={w * 0.5} ry={h * 0.05} fill="#fff7d6" />
+        </g>
+      )
+    case 'l-kron':
+      return (
+        <g stroke={INK} strokeWidth={1.3} vectorEffect="non-scaling-stroke">
+          <line x1={0} y1={-h / 2} x2={0} y2={-h * 0.1} />
+          <path d={`M ${-w * 0.45} ${-h * 0.05} Q 0 ${h * 0.45} ${w * 0.45} ${-h * 0.05}`} fill="none" />
+          {[-0.42, -0.2, 0, 0.2, 0.42].map((k) => (
+            <g key={k}>
+              <line x1={w * k} y1={-h * 0.05 + Math.abs(k) * 0} x2={w * k} y2={-h * 0.22} />
+              <ellipse cx={w * k} cy={-h * 0.28} rx={w * 0.025} ry={h * 0.07} fill="#fff7d6" />
+            </g>
+          ))}
+        </g>
+      )
+    case 'l-schiene':
+      return (
+        <g>
+          <rect x={-w / 2} y={-h * 0.4} width={w} height={h * 0.2} rx={h * 0.06} fill={PLATE} stroke={SOFT} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          {[-0.25, 0.25].map((k) => (
+            <path key={k} d={`M ${w * k - w * 0.05} ${-h * 0.2} L ${w * k + w * 0.05} ${-h * 0.2} L ${w * k + w * 0.07} ${h * 0.4} L ${w * k - w * 0.07} ${h * 0.4} Z`} fill="#8e8e93" stroke={INK} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          ))}
+        </g>
+      )
+    case 'l-vent':
+      return (
+        <g stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke">
+          {[0, 90, 180, 270].map((a) => (
+            <ellipse key={a} cx={w * 0.27} cy={0} rx={w * 0.25} ry={w * 0.06} transform={`rotate(${a + 20})`} fill="#a9784a" />
+          ))}
+          <circle r={w * 0.1} fill="#fff7d6" />
+        </g>
+      )
+    case 'l-band':
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h * 0.3} fill="#fff7d6" stroke={dt.color} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+          {[-0.4, -0.2, 0, 0.2, 0.4].map((k) => (
+            <circle key={k} cx={w * k} cy={0} r={h * 0.18} fill={dt.color} />
+          ))}
+        </g>
+      )
+    case 'l-rgb':
+      return (
+        <g>
+          <rect x={-w * 0.22} y={h * 0.22} width={w * 0.44} height={h * 0.26} rx={3} fill="#8e8e93" />
+          <circle cx={0} cy={-h * 0.08} r={w * 0.5} fill="#f4f4f6" stroke={SOFT} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <path d={`M 0 ${-h * 0.08} L ${w * 0.5} ${-h * 0.08} A ${w * 0.5} ${w * 0.5} 0 0 1 ${w * 0.25} ${-h * 0.08 + w * 0.43} Z`} fill="#ff453a" opacity={0.85} />
+          <path d={`M 0 ${-h * 0.08} L ${w * 0.25} ${-h * 0.08 + w * 0.43} A ${w * 0.5} ${w * 0.5} 0 0 1 ${-w * 0.25} ${-h * 0.08 + w * 0.43} Z`} fill="#30d158" opacity={0.85} />
+          <path d={`M 0 ${-h * 0.08} L ${-w * 0.25} ${-h * 0.08 + w * 0.43} A ${w * 0.5} ${w * 0.5} 0 0 1 ${-w * 0.5} ${-h * 0.08} Z`} fill="#0a84ff" opacity={0.85} />
+        </g>
+      )
+    case 'l-wand':
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={w * 0.12} fill="#3a3a3c" stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <rect x={-w * 0.32} y={-h * 0.4} width={w * 0.64} height={h * 0.16} fill="#fff7d6" />
+          <rect x={-w * 0.32} y={h * 0.24} width={w * 0.64} height={h * 0.16} fill="#fff7d6" />
+        </g>
+      )
+    case 'l-bild':
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h * 0.55} rx={h * 0.25} fill="#b8b8bd" stroke={SOFT} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <rect x={-w * 0.35} y={h * 0.15} width={w * 0.7} height={h * 0.35} fill="#fff7d6" opacity={0.7} />
+        </g>
+      )
+    case 'l-not':
+      return (
+        <g>
+          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h * 0.1} fill="#1f9d55" stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <path d={`M ${-w * 0.36} 0 L ${-w * 0.16} ${-h * 0.25} L ${-w * 0.16} ${-h * 0.1} L ${w * 0.02} ${-h * 0.1} L ${w * 0.02} ${h * 0.1} L ${-w * 0.16} ${h * 0.1} L ${-w * 0.16} ${h * 0.25} Z`} fill="#fff" />
+          <circle cx={w * 0.2} cy={-h * 0.22} r={h * 0.07} fill="#fff" />
+          <path d={`M ${w * 0.2} ${-h * 0.12} L ${w * 0.3} ${h * 0.3} M ${w * 0.2} ${-h * 0.05} L ${w * 0.08} ${h * 0.15} M ${w * 0.2} ${-h * 0.02} L ${w * 0.34} ${h * 0.08}`} stroke="#fff" strokeWidth={3} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </g>
+      )
+    case 'l-aussen':
+      return (
+        <g>
+          <rect x={-w * 0.36} y={h * 0.38} width={w * 0.72} height={h * 0.1} rx={4} fill="#3a3a3c" />
+          <rect x={-w * 0.32} y={-h * 0.45} width={w * 0.64} height={h * 0.85} rx={w * 0.1} fill="#fff7d6" fillOpacity={0.55} stroke={INK} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+          <rect x={-w * 0.36} y={-h * 0.5} width={w * 0.72} height={h * 0.07} rx={4} fill="#3a3a3c" />
         </g>
       )
     case 'sw-1':

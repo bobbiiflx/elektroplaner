@@ -4,6 +4,7 @@ import { CablePicker, CablePickerButton } from './CablePicker'
 import { DevicePicker, DevicePickerButton } from './DevicePicker'
 import { Segmented } from './ui'
 import { SpecFields, mergeSpec } from './SpecFields'
+import { CircuitSelect } from './ElectricPanel'
 
 interface Props {
   cableNodes: number
@@ -62,6 +63,10 @@ export function ToolOptionsBar({ cableNodes, onVertical, onFinishCable, onCancel
         <>
           <DevicePickerButton />
           <SpecFields typeId={opts.deviceTypeId} spec={opts.spec} defaultSeriesId={defaultSeries} onChange={(patch) => setOpts({ spec: mergeSpec(opts.spec, patch) })} layout="bar" />
+          <label className="opt-inline" title="Neue Geräte werden diesem Stromkreis zugeordnet">
+            <span className="small muted">Stromkreis</span>
+            <CircuitSelect value={opts.circuitId ?? ''} onChange={(id) => setOpts({ circuitId: id || undefined })} />
+          </label>
         </>
       )}
 

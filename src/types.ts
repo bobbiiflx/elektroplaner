@@ -55,6 +55,15 @@ export interface Device {
   boxId?: string // Unterputzdose (Preset) oder 'custom'
   boxDia?: number // eigener Dosendurchmesser (mm)
   boxDepth?: number // eigene Dosentiefe (mm)
+  // Freie Position (Decken-/Bodenmontage): wallId = '' und x/y im Grundriss
+  x?: number
+  y?: number
+  // Elektrische Zuordnung (Schaltschrank-Grundlagen)
+  circuitId?: string // Stromkreis
+  control?: 'direct' | 'knx' // direkt über Schalter/Sicherung oder über KNX-Aktor geschaltet
+  dimmable?: boolean // nur Leuchten: ja / nein (undefined = noch nicht entschieden)
+  dimType?: 'phase' | 'v010' | 'dali' | 'pwm' // Dimmart
+  powerW?: number // Leistung in W
 }
 
 export type InstallMethod = 'A2' | 'B2' | 'C'
@@ -126,6 +135,17 @@ export interface ProjectSettings {
   vde: VdeSettings
 }
 
+export type Phase = 'L1' | 'L2' | 'L3' | '3L'
+export interface Circuit {
+  id: string
+  name: string // z. B. „F3 Wohnzimmer Steckdosen“
+  rating: number // Nennstrom des Leitungsschutzschalters in A
+  charac: Characteristic
+  phase: Phase
+  rcd: string // FI-/RCD-Gruppe, z. B. „FI 1 · 30 mA“ (leer = noch nicht zugeordnet)
+  color: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -133,6 +153,7 @@ export interface Project {
   updatedAt: string
   settings: ProjectSettings
   floors: Floor[]
+  circuits?: Circuit[]
 }
 
 export interface ProjectMeta {

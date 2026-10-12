@@ -6,7 +6,7 @@ import type { Device, ProjectSettings, ZoneSettings, InstallMethod } from '../ty
 // Maße in mm: w = Breite, h = Höhe, d = Vorstand vor der Wand.
 // ---------------------------------------------------------------------------
 
-export type DeviceCategory = 'power' | 'switch' | 'data' | 'knx' | 'display' | 'iot' | 'box'
+export type DeviceCategory = 'power' | 'switch' | 'data' | 'knx' | 'display' | 'iot' | 'light' | 'box'
 
 export interface DeviceType {
   id: string
@@ -22,7 +22,27 @@ export interface DeviceType {
   gangs?: number // Rahmenfelder bei Schalterserien (Breite = Rahmen + (n−1) · Mittenabstand)
   sizes?: SizeVariant[] // Größenvarianten bei Typen ohne Rahmen (Richtwerte)
   box?: boolean // hat eine Unterputz-/Gerätedose (Auswahl möglich)
+  mount?: 'wall' | 'ceiling' | 'floor' // Montage: Wand (Standard) oder freie Position an Decke bzw. Boden
+  ceilingDrop?: number // bei Deckenmontage: Abstand der Mitte unter der Decke
+  kind?: DeviceKind // Rolle im Schaltschrank-Konzept (sonst aus der Kategorie abgeleitet)
+  defaultPowerW?: number // Richtwert Leistung bei Neuanlage
+  defaultDimmable?: boolean
 }
+
+/** Rolle eines Geräts: Last (Steckdose, Herd …), Leuchte, Sensor/Taster, Daten, sonstiges. */
+export type DeviceKind = 'load' | 'light' | 'sensor' | 'data' | 'other'
+
+const KIND_BY_CATEGORY: Record<DeviceCategory, DeviceKind> = {
+  power: 'load',
+  switch: 'sensor',
+  knx: 'sensor',
+  data: 'data',
+  display: 'other',
+  iot: 'data',
+  light: 'light',
+  box: 'other',
+}
+export const kindOf = (dt: DeviceType): DeviceKind => dt.kind ?? KIND_BY_CATEGORY[dt.category]
 
 export interface SizeVariant {
   id: string
@@ -38,6 +58,7 @@ export const CATEGORY_LABEL: Record<DeviceCategory, string> = {
   knx: 'KNX',
   display: 'Displays',
   iot: 'IoT / Sicherheit',
+  light: 'Leuchten',
   box: 'Dosen & Verteiler',
 }
 
@@ -61,7 +82,18 @@ export const DEVICE_TYPES: DeviceType[] = [
   { id: 'nfc', name: 'NFC-Leser (Zutritt)', category: 'iot', defaultHeight: 1200, w: 80, h: 80, d: 15, color: '#5ac8fa', price: 160, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'pin', name: 'PIN-Eingabetaster', category: 'iot', defaultHeight: 1200, w: 85, h: 85, d: 15, color: '#5e5ce6', price: 95, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'bell', name: 'Video-Türklingel', category: 'iot', defaultHeight: 1400, w: 70, h: 150, d: 25, color: '#ac8e68', price: 140, boxPrice: 2.5, box: true, sizes: [{ id: 'b1', label: 'Slim 55 × 135', w: 55, h: 135 }, { id: 'b2', label: 'Standard 70 × 150', w: 70, h: 150 }, { id: 'b3', label: 'Groß 100 × 200', w: 100, h: 200 }] },
-  { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0, sizes: [{ id: 'e1', label: 'Wallbox kompakt 220 × 330', w: 220, h: 330 }, { id: 'e2', label: 'Ladesäule 300 × 1400', w: 300, h: 1400 }] },
+  { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', kind: 'load', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0, sizes: [{ id: 'e1', label: 'Wallbox kompakt 220 × 330', w: 220, h: 330 }, { id: 'e2', label: 'Ladesäule 300 × 1400', w: 300, h: 1400 }] },
+  { id: 'l-spot', name: 'Einbau-Deckenstrahler', category: 'light', mount: 'ceiling', ceilingDrop: 0, defaultHeight: 0, w: 90, h: 60, d: 90, color: '#ffd60a', price: 12, boxPrice: 0, defaultPowerW: 6 },
+  { id: 'l-pendel', name: 'Pendelleuchte', category: 'light', mount: 'ceiling', ceilingDrop: 700, defaultHeight: 0, w: 220, h: 300, d: 220, color: '#ffd60a', price: 90, boxPrice: 0, defaultPowerW: 10 },
+  { id: 'l-kron', name: 'Kronleuchter', category: 'light', mount: 'ceiling', ceilingDrop: 400, defaultHeight: 0, w: 600, h: 500, d: 600, color: '#ffd60a', price: 250, boxPrice: 0, defaultPowerW: 30 },
+  { id: 'l-schiene', name: 'Stromschienen-System', category: 'light', mount: 'ceiling', ceilingDrop: 60, defaultHeight: 0, w: 1000, h: 130, d: 80, color: '#ffd60a', price: 110, boxPrice: 0, defaultPowerW: 16 },
+  { id: 'l-vent', name: 'Deckenventilator mit Leuchte', category: 'light', mount: 'ceiling', ceilingDrop: 250, defaultHeight: 0, w: 1100, h: 300, d: 1100, color: '#ffd60a', price: 220, boxPrice: 0, defaultPowerW: 24 },
+  { id: 'l-band', name: 'LED-Band (Voute / Unterbau)', category: 'light', mount: 'ceiling', ceilingDrop: 150, defaultHeight: 0, w: 1000, h: 25, d: 20, color: '#ffd60a', price: 40, boxPrice: 0, defaultPowerW: 24, defaultDimmable: true },
+  { id: 'l-rgb', name: 'Smarte RGB-Leuchte (E27)', category: 'light', mount: 'ceiling', ceilingDrop: 200, defaultHeight: 0, w: 60, h: 110, d: 60, color: '#ffd60a', price: 25, boxPrice: 0, defaultPowerW: 9, defaultDimmable: true },
+  { id: 'l-wand', name: 'Wandleuchte', category: 'light', defaultHeight: 1700, w: 110, h: 250, d: 110, color: '#ffd60a', price: 60, boxPrice: 1.2, box: true, defaultPowerW: 8 },
+  { id: 'l-bild', name: 'Bilderleuchte', category: 'light', defaultHeight: 1900, w: 600, h: 60, d: 100, color: '#ffd60a', price: 55, boxPrice: 1.2, defaultPowerW: 8 },
+  { id: 'l-not', name: 'Notleuchte / Rettungszeichen', category: 'light', defaultHeight: 2300, w: 360, h: 150, d: 50, color: '#30d158', price: 85, boxPrice: 1.2, defaultPowerW: 3 },
+  { id: 'l-aussen', name: 'Außenstehleuchte', category: 'light', mount: 'floor', defaultHeight: 300, w: 250, h: 600, d: 250, color: '#ffd60a', price: 120, boxPrice: 0, defaultPowerW: 10 },
   { id: 'kab-aus', name: 'Kabelauslassdose (Bürste)', category: 'box', defaultHeight: 1100, w: 80, h: 80, d: 12, color: '#8e8e93', price: 7, boxPrice: 1.2, gangs: 1, box: true },
   { id: 'dose-ab', name: 'Abzweigdose', category: 'box', defaultHeight: 2300, w: 80, h: 80, d: 4, color: '#8e8e93', price: 1.8, boxPrice: 0, sizes: [{ id: 'a70', label: 'Abzweigdose Ø 70', w: 70, h: 70 }, { id: 'a80', label: 'Abzweigdose Ø 80', w: 80, h: 80 }, { id: 'a100', label: 'Abzweigdose Ø 100', w: 100, h: 100 }] },
   { id: 'uv', name: 'Unterverteiler', category: 'box', defaultHeight: 1500, w: 400, h: 600, d: 80, color: '#636366', price: 120, boxPrice: 0, sizes: [{ id: 'u1', label: 'Verteiler 1 × 12 TE (≈ 300 × 200)', w: 300, h: 200 }, { id: 'u2', label: 'Verteiler 2 × 12 TE (≈ 300 × 330)', w: 300, h: 330 }, { id: 'u3', label: 'Verteiler 3 × 12 TE (≈ 400 × 600)', w: 400, h: 600 }] },
@@ -280,3 +312,28 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
 
 export const DOOR_DEFAULT = { width: 1010, height: 2135, sill: 0 }
 export const WINDOW_DEFAULT = { width: 1010, height: 1250, sill: 900 }
+
+// ---------------------------------------------------------------------------
+// Stromkreise: Farbpalette, Standardwerte
+// ---------------------------------------------------------------------------
+export const CIRCUIT_COLORS = ['#ff9f0a', '#0a84ff', '#30d158', '#bf5af2', '#ff453a', '#64d2ff', '#ffd60a', '#ff6482', '#5e5ce6', '#ac8e68']
+
+export const DIM_LABEL: Record<NonNullable<Device['dimType']>, string> = {
+  phase: 'Phasenan-/abschnitt (230 V)',
+  v010: '0–10 V',
+  dali: 'DALI',
+  pwm: 'PWM / Konstantspannung (LED-Band)',
+}
+
+/** Startwerte der elektrischen Zuordnung für ein neu gesetztes Gerät. */
+export function electricDefaults(dt: DeviceType): Partial<Device> {
+  const out: Partial<Device> = {}
+  const kind = kindOf(dt)
+  if (kind === 'load' && dt.category === 'power') out.control = 'direct'
+  if (dt.defaultPowerW) out.powerW = dt.defaultPowerW
+  if (kind === 'light' && dt.defaultDimmable !== undefined) {
+    out.dimmable = dt.defaultDimmable
+    if (dt.defaultDimmable) out.dimType = dt.id === 'l-band' ? 'pwm' : 'phase'
+  }
+  return out
+}

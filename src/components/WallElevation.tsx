@@ -9,6 +9,7 @@ import { autoRef, lockAxis, snapWallPoint, type AutoRef } from '../lib/autoDims'
 import { fillFor, missingFor } from '../lib/completeness'
 import { syncDeviceNodes } from '../lib/link'
 import { horizontalBands, verticalSpans } from '../lib/zones'
+import { profileAt, wallProfile } from '../lib/roof'
 import { formatLen } from '../lib/units'
 import { DeviceFace } from './DeviceIcons'
 import { ElevationDims, FreeDim } from './dims'
@@ -80,6 +81,10 @@ export default function WallElevation() {
   const wall: Wall | undefined = floor.walls.find((w) => w.id === wallId)
   const L = wall ? wallLength(wall) : 0
   const H = wall ? (wall.height ?? floor.wallHeight) : floor.wallHeight
+  const profile = useMemo(() => (wall ? wallProfile(floor, wall) : [{ u: 0, h: H }, { u: 0, h: H }]), [floor, wall, H])
+  const flatTop = profile.every((p) => Math.abs(p.h - H) < 1)
+  /** Liegt der Punkt (u, z) über der Dachschräge, also dort, wo keine Wand ist? */
+  const aboveRoof = (u: number, z: number) => !flatTop && z > profileAt(profile, clamp(u, 0, L)) - 20
   const s = view.s
   const px = (n: number) => n / s
   /** Kleine Geräte werden bei weit herausgezoomter Ansicht vergrößert dargestellt, damit sie sichtbar bleiben. */
@@ -255,6 +260,10 @@ export default function WallElevation() {
 
   const addCablePoint = (rawU: number, rawZ: number) => {
     const { node } = cableTarget(rawU, rawZ)
+    if (aboveRoof(rawU, node.z)) {
+      showToast('Hier ist keine Wand – über der Dachschräge.')
+      return
+    }
     const last = draft[draft.length - 1]
     if (!last) {
       setDraft([node])
@@ -273,6 +282,10 @@ export default function WallElevation() {
     }
     const dt = resolveSpec(opts.deviceTypeId, opts.spec, settings.seriesId).dt
     const r = snapFree(rawU, rawZ)
+    if (aboveRoof(r.u, r.z)) {
+      showToast('Hier ist keine Wand – über der Dachschräge.')
+      return
+    }
     const id = uid('d_')
     edit((p) => {
       const f = p.floors.find((x) => x.id === floor.id)
@@ -568,6 +581,9 @@ export default function WallElevation() {
 
   const cursorStyle = panning ? 'grabbing' : tool === 'select' ? 'default' : 'crosshair'
   const gridMinor = g * s >= 7
+  const topLine = profile.map((p) => `${X(p.u)},${-p.h}`).join(' ')
+  const wallPoly = `${topLine} ${X(L)},0 ${X(0)},0`
+  const abovePoly = `${topLine} ${X(L)},${-H} ${X(0)},${-H}`
 
   const sideDevice = (d: (typeof devicesHere)[number]) => d.side === side
 
@@ -600,15 +616,25 @@ export default function WallElevation() {
         <g transform={`translate(${view.tx} ${view.ty}) scale(${s})`}>
           {/* Boden- und Deckenplatte */}
           <rect x={-300} y={0} width={L + 600} height={160} fill="url(#elHatch)" style={{ pointerEvents: 'none' }} />
-          <rect x={-300} y={-H - 160} width={L + 600} height={160} fill="url(#elHatch)" style={{ pointerEvents: 'none' }} />
+          {flatTop && <rect x={-300} y={-H - 160} width={L + 600} height={160} fill="url(#elHatch)" style={{ pointerEvents: 'none' }} />}
 
-          {/* Wandfläche */}
-          <rect x={0} y={-H} width={L} height={H} fill="var(--paper)" stroke="var(--wall)" strokeWidth={px(2)} />
-          {gridMinor && <rect x={0} y={-H} width={L} height={H} fill="url(#elGridMinor)" style={{ pointerEvents: 'none' }} />}
+          {/* Wandfläche (Oberkante folgt der Dachschräge) */}
+          <clipPath id="elWallClip">
+            <polygon points={wallPoly} />
+          </clipPath>
+          <polygon points={wallPoly} fill="var(--paper)" stroke="var(--wall)" strokeWidth={px(2)} />
+          {!flatTop && (
+            <g style={{ pointerEvents: 'none' }}>
+              <polygon points={abovePoly} fill="url(#elHatch)" opacity={0.55} />
+              <polyline points={topLine} fill="none" stroke="#ff9f0a" strokeWidth={px(3)} strokeLinejoin="round" />
+              {label('Dachschräge – dort keine Wand', L / 2, -H + px(16), 'var(--ink-soft)', 'middle', 11)}
+            </g>
+          )}
+          {gridMinor && <rect x={0} y={-H} width={L} height={H} fill="url(#elGridMinor)" clipPath="url(#elWallClip)" style={{ pointerEvents: 'none' }} />}
 
           {/* Installationszonen */}
           {showZones && (
-            <g style={{ pointerEvents: 'none' }}>
+            <g style={{ pointerEvents: 'none' }} clipPath="url(#elWallClip)">
               {spans.map(([a, b], i) => {
                 const x0 = Math.min(X(a), X(b))
                 return <rect key={'v' + i} x={x0} y={-H} width={Math.abs(b - a)} height={H} fill="var(--ok)" opacity={0.16} />

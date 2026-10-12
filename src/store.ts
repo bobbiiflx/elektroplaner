@@ -20,7 +20,8 @@ import { uid } from './lib/geom'
 import type { DetectedWall } from './lib/detectWalls'
 import * as storage from './lib/storage'
 
-export type Tool = 'select' | 'wall' | 'opening' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
+const BUILD_TOOLS: Tool[] = ['wall', 'opening', 'roof', 'calibrate', 'anchor']
+export type Tool = 'select' | 'wall' | 'opening' | 'roof' | 'device' | 'cable' | 'measure' | 'calibrate' | 'anchor'
 export type ViewMode = 'split' | '2d' | '3d'
 
 export interface AskDialog {
@@ -34,7 +35,7 @@ export interface AskDialog {
 }
 
 export interface Selection {
-  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim'
+  kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof'
   id: string
 }
 
@@ -211,7 +212,7 @@ export const useStore = create<State>((set, get) => ({
   printOpen: false,
   schrankOpen: false,
   printLists: false,
-  inspectorTab: 'floor',
+  inspectorTab: 'electric',
   theme: readTheme(),
   showAllFloors: false,
   ghostWalls: false,
@@ -277,7 +278,13 @@ export const useStore = create<State>((set, get) => ({
     fixSelection()
   },
 
-  setTool: (t) => set((st) => ({ tool: t, pickerOpen: t === 'device' || t === 'cable' || t === 'opening' ? (st.tool !== t ? true : st.pickerOpen) : false })),
+  setTool: (t) =>
+    set((st) => ({
+      tool: t,
+      pickerOpen: t === 'device' || t === 'cable' || t === 'opening' ? (st.tool !== t ? true : st.pickerOpen) : false,
+      // Bau-Werkzeuge → Bau-Tab, Elektro-Werkzeuge → Elektro-Tab
+      inspectorTab: BUILD_TOOLS.includes(t) ? 'floor' : (t === 'device' || t === 'cable') && st.inspectorTab === 'floor' ? 'electric' : st.inspectorTab,
+    })),
   select: (selection) => set({ selection }),
   setOpts: (o) => set((s) => ({ opts: { ...s.opts, ...o } })),
   setUnit: (unit) => set({ unit }),
@@ -573,6 +580,8 @@ export const useStore = create<State>((set, get) => ({
       } else if (selection.kind === 'device') {
         f.devices = f.devices.filter((d) => d.id !== selection.id)
         for (const c of f.cables) for (const n of c.points) if (n.deviceId === selection.id) delete n.deviceId
+      } else if (selection.kind === 'roof') {
+        f.roofs = (f.roofs ?? []).filter((r) => r.id !== selection.id)
       } else if (selection.kind === 'dim') {
         f.dims = (f.dims ?? []).filter((d) => d.id !== selection.id)
       } else {
@@ -598,7 +607,11 @@ function fixSelection() {
         ? floor.openings
         : selection.kind === 'device'
           ? floor.devices
-          : floor.cables
+          : selection.kind === 'roof'
+            ? (floor.roofs ?? [])
+            : selection.kind === 'dim'
+              ? (floor.dims ?? [])
+              : floor.cables
   if (!list.some((x) => x.id === selection.id)) useStore.setState({ selection: null })
 }
 

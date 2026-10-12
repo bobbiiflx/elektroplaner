@@ -1383,3 +1383,32 @@ p {
   opacity: 0.45;
   cursor: default;
 }
+
+/* --- Inspector-Tabs: Bau dezent als Symbol --------------------------------- */
+.inspector-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inspector-tabs .seg {
+  flex: 1;
+}
+.tab-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-soft);
+}
+.tab-icon:hover {
+  background: var(--field);
+  color: var(--ink);
+}
+.tab-icon.on {
+  background: var(--accent);
+  color: #fff;
+}

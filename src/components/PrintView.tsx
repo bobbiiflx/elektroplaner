@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { PlanOpening } from './OpeningGlyphs'
+import { wallProfile } from '../lib/roof'
 import { METHOD_LABEL, isGlazed, cableType, deviceType, devType, resolveDevice, type DeviceType } from '../config/catalog'
 import { useFloor, useStore } from '../store'
 import type { Cable, Device, Floor, ProjectSettings, Wall, ZoneSettings } from '../types'
@@ -248,6 +249,9 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
   const runs = wallRuns(floor, wall)
   const bands = horizontalBands(zones, H)
   const spans = verticalSpans(wall, openingsHere, zones)
+  const profile = wallProfile(floor, wall)
+  const flatTop = profile.every((p) => Math.abs(p.h - H) < 1)
+  const topLine = profile.map((p) => `${X(p.u)},${-p.h}`).join(' ')
   const vb = { x: -mL * N, y: -(H + 160) - mT * N, w: L + (mL + mR) * N, h: H + 320 + (mT + mB) * N }
 
   return (
@@ -260,8 +264,10 @@ function WallPage({ floor, wall, wi, side, rows, first, opts, unit, areaW, areaH
             </pattern>
           </defs>
           <rect x={-300} y={0} width={L + 600} height={160} fill={`url(#pvh${wi}${side})`} />
-          <rect x={-300} y={-H - 160} width={L + 600} height={160} fill={`url(#pvh${wi}${side})`} />
-          <rect x={0} y={-H} width={L} height={H} fill="var(--paper)" stroke="var(--wall)" strokeWidth={px(1.2)} />
+          {flatTop && <rect x={-300} y={-H - 160} width={L + 600} height={160} fill={`url(#pvh${wi}${side})`} />}
+          <polygon points={`${topLine} ${X(L)},0 ${X(0)},0`} fill="var(--paper)" stroke="var(--wall)" strokeWidth={px(1.2)} />
+          {!flatTop && <polygon points={`${topLine} ${X(L)},${-H} ${X(0)},${-H}`} fill={`url(#pvh${wi}${side})`} opacity={0.5} />}
+          {!flatTop && <polyline points={topLine} fill="none" stroke="var(--ink)" strokeWidth={px(2)} strokeLinejoin="round" />}
           {opts.zones && (
             <g>
               {spans.map(([a, b], i) => (

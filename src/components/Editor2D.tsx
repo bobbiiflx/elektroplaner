@@ -2,6 +2,7 @@ import { planPoint } from '../lib/runs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus } from 'lucide-react'
 import { findGap, type WallGap } from '../lib/gaps'
+import { roofAxes, roofContour } from '../lib/roof'
 import { PlanOpening } from './OpeningGlyphs'
 import { openingDef, cableType, deviceType, electricDefaults, type DeviceCategory } from '../config/catalog'
 import { useFloor, useStore } from '../store'
@@ -54,6 +55,7 @@ const HINTS: Record<string, string> = {
   cable: 'Leitungen laufen nur waagerecht/senkrecht · Dose oder Schalter anklicken verbindet · Enter beendet · Detailarbeit in der Wandansicht (E)',
   measure: 'Zwei Punkte anklicken, um eine Maßlinie zu zeichnen · Umschalt = waagerecht/senkrecht · rastet an Objektmitten ein',
   calibrate: 'Zwei Punkte mit bekanntem Abstand anklicken',
+  roof: 'Dachschräge: 1. und 2. Klick = Linie, an der die Schräge beginnt (Kniestock/Traufe) · 3. Klick = Seite, zu der sie ansteigt (in den Raum)',
   anchor: 'Passpunkt setzen: denselben Bezugspunkt (z. B. Außenecke, Schacht) in jedem Geschoss anklicken',
 }
 
@@ -94,6 +96,8 @@ export default function Editor2D() {
   const [calib, setCalib] = useState<{ a?: Vec2; b?: Vec2 }>({})
   const [calibReal, setCalibReal] = useState(0)
   const [measureA, setMeasureA] = useState<Vec2 | null>(null)
+  const [roofA, setRoofA] = useState<Vec2 | null>(null)
+  const [roofB, setRoofB] = useState<Vec2 | null>(null)
   const [shiftDown, setShiftDown] = useState(false)
 
   const settings = project.settings
@@ -194,6 +198,8 @@ export default function Editor2D() {
     setCableDraft([])
     setCalib({})
     setMeasureA(null)
+    setRoofA(null)
+    setRoofB(null)
   }, [])
 
   const finishCable = useCallback(() => {
@@ -215,7 +221,7 @@ export default function Editor2D() {
       } else if (e.key === 'Escape') {
         const st = useStore.getState()
         if (st.pickerOpen) st.setPickerOpen(false)
-        else if (draft || cableDraft.length || calib.a || measureA) cancelDrafts()
+        else if (draft || cableDraft.length || calib.a || measureA || roofA) cancelDrafts()
         else setTool('select')
       } else if (e.key === 'Enter') {
         if (tool === 'cable') finishCable()
@@ -233,7 +239,7 @@ export default function Editor2D() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [draft, cableDraft, calib.a, measureA, tool, cancelDrafts, finishCable, fit, setTool])
+  }, [draft, cableDraft, calib.a, measureA, roofA, tool, cancelDrafts, finishCable, fit, setTool])
 
   useEffect(() => {
     cancelDrafts()
@@ -377,6 +383,34 @@ export default function Editor2D() {
       })
     })
     select({ kind: 'opening', id })
+  }
+
+  const addRoofPoint = (raw: Vec2, ortho: boolean) => {
+    if (!roofA) {
+      setRoofA(snap(raw, undefined, false, true).p)
+      return
+    }
+    if (!roofB) {
+      const p = snap(raw, roofA, ortho, true).p
+      if (dist(roofA, p) < 100) return
+      setRoofB(p)
+      return
+    }
+    // 3. Klick: Seite des Anstiegs
+    const dx = roofB.x - roofA.x, dy = roofB.y - roofA.y
+    const side: 1 | -1 = (raw.x - roofA.x) * -dy + (raw.y - roofA.y) * dx >= 0 ? 1 : -1
+    const id = uid('r_')
+    const a = roofA, b = roofB
+    edit((p) => {
+      const f = p.floors.find((x) => x.id === floor.id)
+      if (!f) return
+      f.roofs = f.roofs ?? []
+      f.roofs.push({ id, a, b, side, knee: 1000, angle: 40 })
+    })
+    setRoofA(null)
+    setRoofB(null)
+    select({ kind: 'roof', id })
+    showToast('Dachschräge angelegt – Kniestock und Neigung stehen rechts.')
   }
 
   const placeDevice = (raw: Vec2) => {
@@ -542,6 +576,9 @@ export default function Editor2D() {
       case 'opening':
         placeOpening(raw)
         break
+      case 'roof':
+        addRoofPoint(raw, orthoNow)
+        break
       case 'device':
         placeDevice(raw)
         break
@@ -658,7 +695,7 @@ export default function Editor2D() {
     else if (tool === 'cable') finishCable()
   }
 
-  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim'; id: string }) => {
+  const beginElementDrag = (e: React.PointerEvent, drag: Drag | null, sel?: { kind: 'wall' | 'opening' | 'device' | 'cable' | 'dim' | 'roof'; id: string }) => {
     if (tool !== 'select' || e.button !== 0 || spaceRef.current) return
     e.stopPropagation()
     if (sel) select(sel)
@@ -762,6 +799,10 @@ export default function Editor2D() {
           <pattern id="gridMinor" width={g} height={g} patternUnits="userSpaceOnUse">
             <path d={`M ${g} 0 L 0 0 0 ${g}`} fill="none" stroke="var(--grid-minor)" strokeWidth={px(1)} />
           </pattern>
+          <pattern id="roofHatch" width={90} height={90} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={90} height={90} fill="#ff9f0a" opacity={0.1} />
+            <line x1={0} y1={0} x2={0} y2={90} stroke="#c77c0a" strokeWidth={px(1)} opacity={0.55} />
+          </pattern>
           <pattern id="gridMajor" width={1000} height={1000} patternUnits="userSpaceOnUse">
             <path d="M 1000 0 L 0 0 0 1000" fill="none" stroke="var(--grid-major)" strokeWidth={px(1)} />
           </pattern>
@@ -811,6 +852,55 @@ export default function Editor2D() {
               <line x1={floor.anchor.x} y1={floor.anchor.y - px(14)} x2={floor.anchor.x} y2={floor.anchor.y + px(14)} />
             </g>
           )}
+
+          {/* Dachschrägen */}
+          {(floor.roofs ?? []).map((r) => {
+            const { n } = roofAxes(r)
+            const sel = selection?.kind === 'roof' && selection.id === r.id
+            const c1 = roofContour(r, 1000, floor.wallHeight)
+            const c2 = roofContour(r, 2000, floor.wallHeight)
+            const lowEnd = r.knee < 1000 ? c1 : null
+            const mid = { x: (r.a.x + r.b.x) / 2, y: (r.a.y + r.b.y) / 2 }
+            const ang = (Math.atan2(r.b.y - r.a.y, r.b.x - r.a.x) * 180) / Math.PI
+            return (
+              <g key={r.id}>
+                {lowEnd && <polygon points={`${r.a.x},${r.a.y} ${r.b.x},${r.b.y} ${lowEnd.b.x},${lowEnd.b.y} ${lowEnd.a.x},${lowEnd.a.y}`} fill="url(#roofHatch)" style={{ pointerEvents: 'none' }} />}
+                {[
+                  { c: c1, t: 1000 },
+                  { c: c2, t: 2000 },
+                ].map(({ c, t }) =>
+                  c ? (
+                    <g key={t} style={{ pointerEvents: 'none' }}>
+                      <line x1={c.a.x} y1={c.a.y} x2={c.b.x} y2={c.b.y} stroke="#c77c0a" strokeWidth={px(1.2)} strokeDasharray={`${px(7)} ${px(4)}`} />
+                      {label(`${formatLen(t, unit)} Linie`, (c.a.x + c.b.x) / 2, (c.a.y + c.b.y) / 2 + n.y * px(10), ang, '#c77c0a')}
+                    </g>
+                  ) : null,
+                )}
+                <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke={sel ? 'var(--accent)' : '#ff9f0a'} strokeWidth={px(sel ? 3.5 : 2.5)} strokeDasharray={`${px(10)} ${px(5)}`} style={{ pointerEvents: 'none' }} />
+                <line x1={r.a.x} y1={r.a.y} x2={r.b.x} y2={r.b.y} stroke="transparent" strokeWidth={px(14)} style={{ cursor: tool === 'select' ? 'pointer' : undefined, pointerEvents: tool === 'select' ? 'stroke' : 'none' }} onPointerDown={(e) => beginElementDrag(e, null, { kind: 'roof', id: r.id })} />
+                {/* Anstiegsrichtung */}
+                <g style={{ pointerEvents: 'none' }} stroke={sel ? 'var(--accent)' : '#ff9f0a'} strokeWidth={px(2)} fill="none">
+                  <line x1={mid.x} y1={mid.y} x2={mid.x + n.x * px(28)} y2={mid.y + n.y * px(28)} />
+                  <path d={`M ${mid.x + n.x * px(28) - n.x * px(7) - n.y * px(5)} ${mid.y + n.y * px(28) - n.y * px(7) + n.x * px(5)} L ${mid.x + n.x * px(28)} ${mid.y + n.y * px(28)} L ${mid.x + n.x * px(28) - n.x * px(7) + n.y * px(5)} ${mid.y + n.y * px(28) - n.y * px(7) - n.x * px(5)}`} />
+                </g>
+                {label(`${formatLen(r.knee, unit)} · ${Math.round(r.angle)}°`, mid.x + n.x * px(42), mid.y + n.y * px(42), ang, '#c77c0a')}
+              </g>
+            )
+          })}
+          {tool === 'roof' && roofA && cursor && (() => {
+            const b = roofB ?? snap(cursor, roofA, opts.ortho, true).p
+            const dx = b.x - roofA.x, dy = b.y - roofA.y
+            const L = Math.hypot(dx, dy) || 1
+            let nx = -dy / L, ny = dx / L
+            if (roofB && (cursor.x - roofA.x) * -dy + (cursor.y - roofA.y) * dx < 0) { nx = -nx; ny = -ny }
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                <line x1={roofA.x} y1={roofA.y} x2={b.x} y2={b.y} stroke="#ff9f0a" strokeWidth={px(2.5)} strokeDasharray={`${px(10)} ${px(5)}`} />
+                <circle cx={roofA.x} cy={roofA.y} r={px(4)} fill="#ff9f0a" />
+                {roofB && <polygon points={`${roofA.x},${roofA.y} ${b.x},${b.y} ${b.x + nx * px(60)},${b.y + ny * px(60)} ${roofA.x + nx * px(60)},${roofA.y + ny * px(60)}`} fill="#ff9f0a" opacity={0.18} />}
+              </g>
+            )
+          })()}
 
           {/* Wände */}
           {floor.walls.map((w) => {

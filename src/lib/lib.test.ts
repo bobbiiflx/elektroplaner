@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../config/catalog'
 import { findGap } from './gaps'
+import { roofHeightAt, wallProfile, roofContour, roofIssues } from './roof'
 import { cableLengths, nearestWall, pointOnWall, wallLength } from './geom'
 import { sampleProject, elevationOf } from './factory'
 import { formatLen, fromDisplay, parseNum, toDisplay } from './units'
@@ -397,5 +398,48 @@ describe('findGap', () => {
     const walls = [W('a', 0, 0, 2000, 0), W('b', 3500, 0, 6000, 0), W('c', 2000, 0, 3500, 0)]
     expect(findGap(walls, { x: 2700, y: 0 })).toBeNull()
     expect(findGap([walls[0], walls[1]], { x: 2700, y: 1500 })).toBeNull()
+  })
+})
+
+describe('Dachschräge', () => {
+  const floor = () => {
+    const f = sampleProject().floors[0]
+    f.walls = [
+      { id: 'g', a: { x: 0, y: 0 }, b: { x: 6000, y: 0 }, thickness: 240, kind: 'outer' as const }, // Giebelwand parallel zur Traufe? nein: quer
+    ]
+    f.wallHeight = 3500
+    // Traufe bei y=0, Anstieg nach +y (Normale (-dy,dx)*side: Linie in +x → n=(0,1)·side)
+    f.roofs = [{ id: 'r', a: { x: 0, y: 0 }, b: { x: 6000, y: 0 }, side: 1, knee: 1000, angle: 45 }]
+    return f
+  }
+  it('Höhe steigt mit dem Abstand zur Traufe bis zur Obergrenze', () => {
+    const f = floor()
+    expect(roofHeightAt(f, { x: 1000, y: 0 })).toBe(1000)
+    expect(Math.round(roofHeightAt(f, { x: 1000, y: 800 }))).toBe(1800)
+    expect(roofHeightAt(f, { x: 1000, y: 5000 })).toBe(3500)
+    expect(roofHeightAt(f, { x: 1000, y: -500 })).toBe(3500) // andere Seite: unbeeinflusst
+  })
+  it('Giebelwand bekommt ein geneigtes Profil, Kniestockwand eine flache Oberkante', () => {
+    const f = floor()
+    f.walls = [
+      { id: 'k', a: { x: 0, y: 0 }, b: { x: 4000, y: 0 }, thickness: 240, kind: 'outer' as const },
+      { id: 'gw', a: { x: 0, y: 0 }, b: { x: 0, y: 4000 }, thickness: 240, kind: 'outer' as const },
+    ]
+    const k = wallProfile(f, f.walls[0])
+    expect(k.every((p) => Math.abs(p.h - 1000) < 1)).toBe(true)
+    const g = wallProfile(f, f.walls[1])
+    expect(Math.round(g[0].h)).toBe(1000)
+    expect(Math.round(g[g.length - 1].h)).toBe(3500)
+    expect(g.length).toBeLessThan(6)
+  })
+  it('Höhenlinien und Prüfung', () => {
+    const f = floor()
+    const c = roofContour(f.roofs![0], 2000, f.wallHeight)!
+    expect(Math.round(c.dist)).toBe(1000)
+    f.walls = [{ id: 'gw', a: { x: 0, y: 0 }, b: { x: 0, y: 4000 }, thickness: 240, kind: 'outer' as const }]
+    f.devices = [{ id: 'd1', typeId: 'steckdose-1', wallId: 'gw', offset: 100, side: 1, height: 300 } as never, { id: 'd2', typeId: 'steckdose-1', wallId: 'gw', offset: 100, side: 1, height: 1500 } as never]
+    f.cables = []
+    const issues = roofIssues(f)
+    expect(issues.map((i) => i.id)).toEqual(['d2'])
   })
 })

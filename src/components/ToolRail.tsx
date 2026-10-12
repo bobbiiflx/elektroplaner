@@ -2,10 +2,21 @@ import { BrickWall, Cable, DoorOpen, Hammer, MousePointer2, Plug, Ruler, ScanSea
 import { useState, type ReactNode } from 'react'
 import { useStore, type Tool } from '../store'
 
+/** Symbol: Dachschräge im Schnitt */
+const RoofIcon = ({ size = 19 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 20V13L14 4v16" />
+    <path d="M3 13l11-9" strokeDasharray="0" />
+    <path d="M14 20h7" />
+    <path d="M7 20v-4" opacity={0.6} />
+  </svg>
+)
+
 export const TOOLS: { id: Tool; label: string; key: string; icon: ReactNode; group?: 'build' }[] = [
   { id: 'select', label: 'Auswählen', key: 'V', icon: <MousePointer2 size={19} /> },
   { id: 'wall', label: 'Wand zeichnen', key: 'W', icon: <BrickWall size={19} />, group: 'build' },
   { id: 'opening', label: 'Tür / Fenster / Hebe-Schiebetür', key: 'O', icon: <DoorOpen size={19} />, group: 'build' },
+  { id: 'roof', label: 'Dachschräge zeichnen', key: 'R', icon: <RoofIcon />, group: 'build' },
   { id: 'device', label: 'Steckdose / Schalter / Dose', key: 'D', icon: <Plug size={19} /> },
   { id: 'cable', label: 'Leitung verlegen', key: 'C', icon: <Cable size={19} /> },
   { id: 'measure', label: 'Lineal – Maße zeichnen', key: 'M', icon: <Ruler size={19} /> },

@@ -6,8 +6,9 @@ import { cableType, devType, isGlazed } from '../config/catalog'
 import { elevationOf } from '../lib/factory'
 import { boundsOf, cableLengths, pointOnWall, wallAngleDeg, wallDir, wallLength, wallNormal } from '../lib/geom'
 import { horizontalBands, verticalSpans } from '../lib/zones'
+import { minProfile, roofAxes, wallProfile } from '../lib/roof'
 import { useStore } from '../store'
-import type { Cable, Device, Floor, Opening, Project, Wall } from '../types'
+import type { Cable, Device, Floor, Opening, Project, RoofPlane, Wall } from '../types'
 
 const ACCENT = '#0071e3'
 const mm = (v: number) => v / 1000
@@ -31,6 +32,7 @@ function WallMesh({
   wall,
   openings,
   height,
+  roofs,
   selected,
   opacity,
   interactive,
@@ -40,6 +42,7 @@ function WallMesh({
   wall: Wall
   openings: Opening[]
   height: number
+  roofs?: RoofPlane[]
   selected: boolean
   opacity: number
   interactive: boolean
@@ -52,12 +55,15 @@ function WallMesh({
   const { geo, edges } = useMemo(() => {
     const total = L + t
     const H = height
-    const hs = H - 10
+    const prof = wallProfile({ wallHeight: H, roofs } as Floor, { ...wall, height: undefined })
+    const hsAt = (u0: number, u1: number) => Math.max(0, minProfile(prof, u0, u1) - 10)
     const sorted = [...openings].sort((a, b) => a.offset - b.offset)
     const shape = new THREE.Shape()
     shape.moveTo(0, 0)
     for (const o of sorted) {
       if (o.sill > 0.5) continue
+      const hs = hsAt(o.offset, o.offset + o.width)
+      if (hs < 100) continue
       const x0 = mm(o.offset + t / 2)
       const x1 = mm(o.offset + t / 2 + o.width)
       const y1 = mm(Math.min(o.height, hs))
@@ -67,16 +73,19 @@ function WallMesh({
       shape.lineTo(x1, 0)
     }
     shape.lineTo(mm(total), 0)
-    shape.lineTo(mm(total), mm(H))
-    shape.lineTo(0, mm(H))
+    // Oberkante entlang der Dachschräge (rückwärts)
+    shape.lineTo(mm(total), Math.max(0.005, mm(prof[prof.length - 1].h)))
+    for (let i = prof.length - 1; i >= 0; i--) shape.lineTo(mm(prof[i].u + t / 2), Math.max(0.005, mm(prof[i].h)))
+    shape.lineTo(0, Math.max(0.005, mm(prof[0].h)))
     shape.closePath()
     for (const o of sorted) {
       if (o.sill <= 0.5) continue
+      const hs = hsAt(o.offset, o.offset + o.width)
       const x0 = mm(o.offset + t / 2)
       const x1 = mm(o.offset + t / 2 + o.width)
       const y0 = mm(o.sill)
       const y1 = mm(Math.min(o.sill + o.height, hs))
-      if (y1 <= y0) continue
+      if (y1 <= y0 + 0.05) continue
       const hole = new THREE.Path()
       hole.moveTo(x0, y0)
       hole.lineTo(x1, y0)
@@ -88,7 +97,7 @@ function WallMesh({
     const g = new THREE.ExtrudeGeometry(shape, { depth: mm(t), bevelEnabled: false })
     g.translate(0, 0, -mm(t) / 2)
     return { geo: g, edges: new THREE.EdgesGeometry(g, 25) }
-  }, [L, t, height, openings])
+  }, [L, t, height, openings, roofs, wall])
 
   const d = wallDir(wall)
   const pos: [number, number, number] = [mm(wall.a.x - (d.x * t) / 2), 0, mm(wall.a.y - (d.y * t) / 2)]
@@ -126,6 +135,35 @@ function WallMesh({
           </mesh>
         ))}
     </group>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Dachfläche (halbtransparent) – zeigt, wo die Schräge verläuft
+// ---------------------------------------------------------------------------
+function RoofMesh({ roof, cap, opacity }: { roof: RoofPlane; cap: number; opacity: number }) {
+  const geo = useMemo(() => {
+    const t = Math.tan((roof.angle * Math.PI) / 180)
+    const { n } = roofAxes(roof)
+    const dd = Math.min(20000, t < 0.01 ? 20000 : (cap - roof.knee) / t)
+    const h2 = Math.min(cap, roof.knee + t * dd)
+    const P = (x: number, y: number, h: number) => [mm(x), mm(h), mm(y)]
+    const v = [
+      ...P(roof.a.x, roof.a.y, roof.knee),
+      ...P(roof.b.x, roof.b.y, roof.knee),
+      ...P(roof.b.x + n.x * dd, roof.b.y + n.y * dd, h2),
+      ...P(roof.a.x + n.x * dd, roof.a.y + n.y * dd, h2),
+    ]
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+    g.setIndex([0, 1, 2, 0, 2, 3])
+    g.computeVertexNormals()
+    return g
+  }, [roof, cap])
+  return (
+    <mesh geometry={geo} raycast={() => null}>
+      <meshStandardMaterial color="#ff9f0a" transparent opacity={0.22 * opacity} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -314,12 +352,16 @@ function FloorModel({
             wall={w}
             openings={floor.openings.filter((o) => o.wallId === w.id)}
             height={w.height ?? floor.wallHeight}
+            roofs={floor.roofs}
             selected={selection?.kind === 'wall' && selection.id === w.id}
             opacity={opacity}
             interactive={active}
             dark={dark}
             onSelect={() => select({ kind: 'wall', id: w.id })}
           />
+        ))}
+        {(floor.roofs ?? []).map((r) => (
+          <RoofMesh key={r.id} roof={r} cap={floor.wallHeight} opacity={active ? 1 : 0.4} />
         ))}
       </group>
       {floor.devices.map((d) => (

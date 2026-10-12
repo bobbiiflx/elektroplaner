@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Hammer, Trash2 } from 'lucide-react'
 import {
   CABLE_TYPES,
   CATEGORY_LABEL,
@@ -23,6 +23,8 @@ import type { Cable, Device, Dimension, Floor, InstallMethod, Opening, Wall } fr
 import { LenField, NumberField } from './NumberField'
 import { Row, Section, Segmented } from './ui'
 import { OPENING_TYPES, openingDef } from '../config/catalog'
+import { roofContour, roofIssues } from '../lib/roof'
+import type { RoofPlane } from '../types'
 import { OpeningIcon } from './OpeningGlyphs'
 import { SpecFields } from './SpecFields'
 import { ElectricFields, ElectricOverview } from './ElectricPanel'
@@ -47,6 +49,9 @@ export default function Inspector() {
   } else if (selection?.kind === 'cable') {
     const c = floor.cables.find((x) => x.id === selection.id)
     body = c ? <CablePanel cable={c} floor={floor} /> : null
+  } else if (selection?.kind === 'roof') {
+    const r = (floor.roofs ?? []).find((x) => x.id === selection.id)
+    body = r ? <RoofPanel roof={r} floor={floor} /> : null
   } else if (selection?.kind === 'dim') {
     const m = (floor.dims ?? []).find((x) => x.id === selection.id)
     body = m ? <DimPanel dim={m} /> : null
@@ -329,6 +334,59 @@ function DevicePanel({ device, floor }: { device: Device; floor: Floor }) {
   )
 }
 
+function RoofPanel({ roof, floor }: { roof: RoofPlane; floor: Floor }) {
+  const editFloor = useEditFloor()
+  const unit = useStore((s) => s.unit)
+  const upd = (fn: (r: RoofPlane) => void, key?: string) =>
+    editFloor((f) => {
+      const r = (f.roofs ?? []).find((x) => x.id === roof.id)
+      if (r) fn(r)
+    }, key)
+  const key = (k: string) => `${k}:${roof.id}`
+  const c1 = roofContour(roof, 1000, floor.wallHeight)
+  const c2 = roofContour(roof, 2000, floor.wallHeight)
+  const cap = roofContour(roof, floor.wallHeight, floor.wallHeight)
+  return (
+    <Section title="Dachschräge">
+      <Row label="Kniestock" hint="Höhe an der Linie">
+        <LenField mm={roof.knee} min={0} max={floor.wallHeight - 100} onCommit={(v) => upd((r) => void (r.knee = v), key('k'))} />
+      </Row>
+      <Row label="Neigung">
+        <NumberField value={roof.angle} decimals={1} suffix="°" min={5} max={85} onCommit={(v) => upd((r) => void (r.angle = v), key('a'))} />
+      </Row>
+      <Row label="Anstieg zur Seite">
+        <button className="btn small" onClick={() => upd((r) => void (r.side = (r.side === 1 ? -1 : 1) as 1 | -1))}>
+          Seite wechseln
+        </button>
+      </Row>
+      <p className="muted small">
+        {c1 ? <>1-m-Linie: {formatLen(c1.dist, unit)} von der Linie · </> : roof.knee >= 1000 ? <>Kniestock ≥ 1 m · </> : null}
+        {c2 ? <>2-m-Linie: {formatLen(c2.dist, unit)} · </> : null}
+        {cap ? <>First ({formatLen(floor.wallHeight, unit)}) nach {formatLen(cap.dist, unit)}</> : null}
+      </p>
+      <p className="muted small">Obergrenze ist die Wandhöhe des Geschosses (Firsthöhe). Wände unter der Schräge werden automatisch schräg abgeschnitten; darüber ist keine Wand.</p>
+    </Section>
+  )
+}
+
+function RoofWarnings({ floor }: { floor: Floor }) {
+  const issues = useMemo(() => roofIssues(floor), [floor])
+  const select = useStore((s) => s.select)
+  if (!issues.length) return null
+  return (
+    <Section title="Dachschräge – Prüfung">
+      <p className="small" style={{ color: 'var(--warn, #c77c0a)' }}>
+        {issues.length} Element{issues.length === 1 ? '' : 'e'} über der Dachschräge (dort ist keine Wand):
+      </p>
+      {issues.slice(0, 8).map((i) => (
+        <button key={i.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: i.kind, id: i.id })}>
+          {i.kind === 'device' ? 'Gerät' : 'Leitung'}: {i.text}
+        </button>
+      ))}
+    </Section>
+  )
+}
+
 function DimPanel({ dim }: { dim: Dimension }) {
   const unit = useStore((s) => s.unit)
   const dx = Math.abs(dim.b.x - dim.a.x)
@@ -496,6 +554,7 @@ function FloorPanel({ floor }: { floor: Floor }) {
   const edit = useStore((s) => s.edit)
   const project = useStore((s) => s.project)
   const setTool = useStore((s) => s.setTool)
+  const select = useStore((s) => s.select)
   const openImport = useStore((s) => s.openImport)
   const clearBackground = useStore((s) => s.clearBackground)
   const removeFloor = useStore((s) => s.removeFloor)
@@ -542,13 +601,16 @@ function FloorPanel({ floor }: { floor: Floor }) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'floor', label: 'Geschoss' },
             { value: 'electric', label: 'Elektro' },
             { value: 'knx', label: 'KNX' },
             { value: 'cabinet', label: 'Schrank' },
           ]}
         />
+        <button className={'tab-icon' + (tab === 'floor' ? ' on' : '')} title="Bau: Geschoss, Grundriss, Dachschrägen" aria-label="Bau" aria-pressed={tab === 'floor'} onClick={() => setTab('floor')}>
+          <Hammer size={16} />
+        </button>
       </div>
+      {tab !== 'floor' && <RoofWarnings floor={floor} />}
       {tab === 'floor' && (
       <>
       <Section title="Geschoss">
@@ -559,13 +621,26 @@ function FloorPanel({ floor }: { floor: Floor }) {
             onChange={(e) => upd((f) => void (f.name = e.target.value), `name:${floor.id}`)}
           />
         </Row>
-        <Row label="Wandhöhe" hint="Standard">
+        <Row label="Wandhöhe" hint={(floor.roofs?.length ?? 0) > 0 ? '= Firsthöhe' : 'Standard'}>
           <LenField mm={floor.wallHeight} min={500} onCommit={(v) => upd((f) => void (f.wallHeight = v), `wh:${floor.id}`)} />
         </Row>
         <Row label="Geschosshöhe" hint="inkl. Decke">
           <LenField mm={floor.levelHeight} min={500} onCommit={(v) => upd((f) => void (f.levelHeight = v), `lh:${floor.id}`)} />
         </Row>
       </Section>
+
+      <Section title="Dachschrägen">
+        {(floor.roofs ?? []).length === 0 && <p className="muted small">Für Dachgeschosse: Linie ziehen, an der die Schräge beginnt (Kniestock), dann die Neigung einstellen. Wände werden schräg abgeschnitten, über der Schräge ist keine Wand.</p>}
+        {(floor.roofs ?? []).map((r, i) => (
+          <button key={r.id} className="btn small block" style={{ textAlign: 'left', marginBottom: 4 }} onClick={() => select({ kind: 'roof', id: r.id })}>
+            Dachschräge {i + 1} · Kniestock {Math.round(r.knee / 10)} cm · {Math.round(r.angle)}°
+          </button>
+        ))}
+        <button className="btn block" onClick={() => setTool('roof')}>
+          Dachschräge zeichnen
+        </button>
+      </Section>
+      <RoofWarnings floor={floor} />
 
       {project.floors.length > 1 && (
         <Section title="Geschosse stapeln">

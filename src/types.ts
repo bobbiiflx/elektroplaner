@@ -96,6 +96,16 @@ export interface Dimension {
   b: Vec2
 }
 
+/** Dachschräge: Ebene, die an der Linie a–b (Kniestock/Traufe) mit Höhe `knee` beginnt und zur Seite `side` mit `angle` ansteigt. Obergrenze ist die Geschoss-Wandhöhe (Firsthöhe). */
+export interface RoofPlane {
+  id: string
+  a: Vec2
+  b: Vec2
+  side: 1 | -1 // Anstiegsrichtung = Normale (-dy, dx) · side
+  knee: number // Höhe über OKFF an der Linie (mm)
+  angle: number // Neigung in Grad
+}
+
 export interface Floor {
   id: string
   name: string
@@ -107,6 +117,7 @@ export interface Floor {
   devices: Device[]
   cables: Cable[]
   dims?: Dimension[]
+  roofs?: RoofPlane[] // Dachschrägen (begrenzen die Wandhöhe)
   anchor?: Vec2 // Passpunkt zum Übereinanderlegen der Geschosse
 }
 

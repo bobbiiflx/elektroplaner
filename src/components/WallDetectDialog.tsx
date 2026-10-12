@@ -205,10 +205,18 @@ function Inner() {
         f.walls = []
         f.openings = []
       }
-      for (const w of active)
-        f.walls.push({ id: uid('w_'), a: { x: Math.round(w.a.x + ox), y: Math.round(w.a.y + oy) }, b: { x: Math.round(w.b.x + ox), y: Math.round(w.b.y + oy) }, thickness: w.thickness, kind: w.kind })
+      for (const w of active) {
+        const id = uid('w_')
+        f.walls.push({ id, a: { x: Math.round(w.a.x + ox), y: Math.round(w.a.y + oy) }, b: { x: Math.round(w.b.x + ox), y: Math.round(w.b.y + oy) }, thickness: w.thickness, kind: w.kind })
+        // Lücken in der Schraffur → Türen (innen) bzw. Fenster (außen)
+        for (const g of w.gaps ?? []) {
+          const win = w.kind === 'outer'
+          f.openings.push({ id: uid('o_'), wallId: id, type: win ? 'window' : 'door', offset: Math.round(g.from), width: Math.round(g.to - g.from), height: win ? 1350 : 2010, sill: win ? 900 : 0 })
+        }
+      }
     })
-    showToast(`${active.length} Wände übernommen`)
+    const nOp = active.reduce((n, w) => n + (w.gaps?.length ?? 0), 0)
+    showToast(`${active.length} Wände${nOp ? ` und ${nOp} Öffnungen` : ''} übernommen`)
     close()
   }
 

@@ -120,6 +120,9 @@ export async function renderWallMask(doc: PdfDoc, pageNo: number, o: MaskOpts): 
           const sc = Math.hypot(st.ctm[0], st.ctm[1]) || 1
           const seg = new Path2D()
           let n = 0
+          // Schraffur = einzelne 2-Punkt-Striche; Möbel/Symbole sind Polylinien oder Kurven
+          let nodes = 0
+          for (let k = 0; k < data.length; ) { const c = data[k]; if (c === 0 || c === 1) { nodes++; k += 3 } else if (c === 2) { nodes += 9; k += 7 } else if (c === 3) { nodes += 9; k += 5 } else k += 1 }
           let cur: [number, number] | null = null
           for (let k = 0; k < data.length; ) {
             const c = data[k]
@@ -129,7 +132,7 @@ export async function renderWallMask(doc: PdfDoc, pageNo: number, o: MaskOpts): 
               const p0 = ap(m, cur[0], cur[1]), p1 = ap(m, nx[0], nx[1])
               const ang = (Math.abs(Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) * 180) / Math.PI) % 90
               const lenMm = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) * o.ptToMm
-              if (ang > 8 && ang < 82 && lenMm >= 110 && lenMm <= 800) { seg.moveTo(cur[0], cur[1]); seg.lineTo(nx[0], nx[1]); n++ }
+              if (nodes === 2 && ang > 30 && ang < 60 && lenMm >= 110 && lenMm <= 800) { seg.moveTo(cur[0], cur[1]); seg.lineTo(nx[0], nx[1]); n++ }
               cur = nx; k += 3
             } else if (c === 2) { cur = [data[k + 5], data[k + 6]]; k += 7 }
             else if (c === 3) { cur = [data[k + 3], data[k + 4]]; k += 5 }

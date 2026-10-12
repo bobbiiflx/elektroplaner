@@ -4,6 +4,7 @@ export interface DetectedWall {
   b: { x: number; y: number }
   thickness: number
   kind: 'outer' | 'inner'
+  gaps?: { from: number; to: number }[] // Lücken in der Wand (mm ab Punkt a) → Türen/Fenster
 }
 
 export interface DetectOpts {
@@ -110,7 +111,7 @@ const dilateSym = (m: Uint8Array, w: number, h: number, r: number) => boxOp(m, w
 const openSym = (m: Uint8Array, w: number, h: number, r: number) => dilateSym(erodeSym(m, w, h, r), w, h, r)
 const closeSym = (m: Uint8Array, w: number, h: number, r: number) => erodeSym(dilateSym(m, w, h, r), w, h, r)
 
-interface Band { horiz: boolean; c: number; p0: number; p1: number; t: number }
+interface Band { horiz: boolean; c: number; p0: number; p1: number; t: number; gaps?: [number, number][] }
 
 function runMask(m: Uint8Array, w: number, h: number, minRun: number, horiz: boolean): Uint8Array {
   const out = new Uint8Array(w * h)
@@ -258,7 +259,10 @@ export function detectWallsCls(cls: Uint8Array, width: number, height: number, m
     const out: Band[] = []
     for (const b of sorted) {
       const last = out.find((o) => Math.abs(o.c - b.c) * cmm <= 50 && Math.abs(o.t - b.t) * cmm <= 60 && b.p0 - o.p1 <= maxGap / cmm && b.p0 >= o.p0)
-      if (last) { last.p1 = Math.max(last.p1, b.p1) } else out.push({ ...b })
+      if (last) {
+        if (b.p0 > last.p1) (last.gaps ??= []).push([last.p1, b.p0])
+        last.p1 = Math.max(last.p1, b.p1)
+      } else out.push({ ...b })
     }
     return out
   }
@@ -267,7 +271,8 @@ export function detectWallsCls(cls: Uint8Array, width: number, height: number, m
   const toWall = (b: Band): DetectedWall => {
     const t = Math.round((b.t * cmm) / 5) * 5
     const p = (u: number, c: number) => (b.horiz ? { x: u * cmm * 1, y: c * cmm } : { x: c * cmm, y: u * cmm })
-    return { a: p(b.p0, b.c), b: p(b.p1, b.c), thickness: t, kind: t >= 220 ? 'outer' : 'inner' }
+    const gaps = (b.gaps ?? []).map(([g0, g1]) => ({ from: (g0 - b.p0) * cmm, to: (g1 - b.p0) * cmm })).filter((g) => g.to - g.from >= 600)
+    return { a: p(b.p0, b.c), b: p(b.p1, b.c), thickness: t, kind: t >= 220 ? 'outer' : 'inner', gaps }
   }
   const walls = [...H.map(toWall), ...V.map(toWall)]
 

@@ -27,17 +27,13 @@
   "kab-aus.png": "5. Blatt e11",
   "cam.png": "aus Archiv",
   "nfc.png": "aus Archiv",
-  "l-kron.png": "6. Blatt (Leuchten) l03",
   "l-pendel.png": "6. Blatt (Leuchten) l04",
   "l-spot.png": "6. Blatt (Leuchten) l05",
   "l-wand.png": "6. Blatt (Leuchten) l06",
   "l-aussen.png": "6. Blatt (Leuchten) l07",
   "l-schiene.png": "6. Blatt (Leuchten) l08",
-  "l-band.png": "6. Blatt (Leuchten) l10",
   "l-bild.png": "6. Blatt (Leuchten) l11",
-  "l-vent.png": "6. Blatt (Leuchten) l12",
   "l-rgb.png": "6. Blatt (Leuchten) l14",
-  "l-not.png": "6. Blatt (Leuchten) l15",
   "l-decke.png": "7. Blatt m01",
   "a-decke.png": "m02",
   "a-wand.png": "m03",
@@ -111,6 +107,10 @@
   "knx-aktor-schalt-8fach.png": "7. Blatt m11 – Schaltaktor 8-fach (für Etappe 4)",
   "knx-aktor-jalousie-8fach.png": "7. Blatt m12 – Jalousieaktor 8-fach (für Etappe 4)",
   "knx-aktor-dimm-4fach.png": "7. Blatt m15 – Dimmaktor 4-fach (für Etappe 4)",
-  "knx-aktor-heizung-6fach.png": "7. Blatt m16 – Heizungs-/Schaltaktor 6-fach (für Etappe 4)"
+  "knx-aktor-heizung-6fach.png": "7. Blatt m16 – Heizungs-/Schaltaktor 6-fach (für Etappe 4)",
+  "l-kron.png": "Kronleuchter – vom Nutzer aus dem Katalog entfernt",
+  "l-vent.png": "Deckenventilator – vom Nutzer aus dem Katalog entfernt",
+  "l-band.png": "LED-Band – vom Nutzer aus dem Katalog entfernt",
+  "l-not.png": "Notleuchte – vom Nutzer aus dem Katalog entfernt"
  }
 }

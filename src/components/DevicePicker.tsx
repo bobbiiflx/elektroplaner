@@ -68,7 +68,7 @@ export function DevicePicker() {
                       <PlanSymbol typeId={d.id} size={24} />
                     </span>
                     <span className="dev-name">{d.name}</span>
-                    <span className="dev-meta">{formatLen(d.defaultHeight, unit)} über OKFF</span>
+                    <span className="dev-meta">{d.mount === 'ceiling' ? 'Deckenmontage · Grundriss' : d.mount === 'floor' ? 'Bodenmontage · Grundriss' : `${formatLen(d.defaultHeight, unit)} über OKFF`}</span>
                   </button>
                 ))}
               </div>

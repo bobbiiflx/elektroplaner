@@ -1,17 +1,13 @@
 // Zuordnung der Produkt-Icons (freigestellte PNGs in src/assets/icons) zu Geräte- und Leitungstypen.
 // Ohne Eintrag zeichnet die App ein vereinfachtes Ersatz-Icon. Nicht verwendete Icons liegen in
 // src/assets/icons/unused (siehe manifest.json) und sind hier bewusst nicht eingebunden.
-import lKron from '../assets/icons/l-kron.png'
 import lPendel from '../assets/icons/l-pendel.png'
 import lSpot from '../assets/icons/l-spot.png'
 import lWand from '../assets/icons/l-wand.png'
 import lAussen from '../assets/icons/l-aussen.png'
 import lSchiene from '../assets/icons/l-schiene.png'
-import lBand from '../assets/icons/l-band.png'
 import lBild from '../assets/icons/l-bild.png'
-import lVent from '../assets/icons/l-vent.png'
 import lRgb from '../assets/icons/l-rgb.png'
-import lNot from '../assets/icons/l-not.png'
 import lDecke from '../assets/icons/l-decke.png'
 import lPanel from '../assets/icons/l-panel.png'
 import lFeucht from '../assets/icons/l-feucht.png'
@@ -57,17 +53,13 @@ export const DEVICE_IMG: Record<string, string> = {
   'sw-1': sw1,
   'sw-w': sw1, // Wechselschalter sieht von vorn aus wie der Ausschalter
   'sw-jal': swJal,
-  'l-kron': lKron,
   'l-pendel': lPendel,
   'l-spot': lSpot,
   'l-wand': lWand,
   'l-aussen': lAussen,
   'l-schiene': lSchiene,
-  'l-band': lBand,
   'l-bild': lBild,
-  'l-vent': lVent,
   'l-rgb': lRgb,
-  'l-not': lNot,
   'l-decke': lDecke,
   'l-panel': lPanel,
   'l-feucht': lFeucht,

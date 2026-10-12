@@ -265,43 +265,12 @@ function DeviceFaceBase({ dt }: { dt: DeviceType }) {
           <ellipse cx={0} cy={h * 0.4} rx={w * 0.5} ry={h * 0.05} fill="#fff7d6" />
         </g>
       )
-    case 'l-kron':
-      return (
-        <g stroke={INK} strokeWidth={1.3} vectorEffect="non-scaling-stroke">
-          <line x1={0} y1={-h / 2} x2={0} y2={-h * 0.1} />
-          <path d={`M ${-w * 0.45} ${-h * 0.05} Q 0 ${h * 0.45} ${w * 0.45} ${-h * 0.05}`} fill="none" />
-          {[-0.42, -0.2, 0, 0.2, 0.42].map((k) => (
-            <g key={k}>
-              <line x1={w * k} y1={-h * 0.05 + Math.abs(k) * 0} x2={w * k} y2={-h * 0.22} />
-              <ellipse cx={w * k} cy={-h * 0.28} rx={w * 0.025} ry={h * 0.07} fill="#fff7d6" />
-            </g>
-          ))}
-        </g>
-      )
     case 'l-schiene':
       return (
         <g>
           <rect x={-w / 2} y={-h * 0.4} width={w} height={h * 0.2} rx={h * 0.06} fill={PLATE} stroke={SOFT} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
           {[-0.25, 0.25].map((k) => (
             <path key={k} d={`M ${w * k - w * 0.05} ${-h * 0.2} L ${w * k + w * 0.05} ${-h * 0.2} L ${w * k + w * 0.07} ${h * 0.4} L ${w * k - w * 0.07} ${h * 0.4} Z`} fill="#8e8e93" stroke={INK} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-          ))}
-        </g>
-      )
-    case 'l-vent':
-      return (
-        <g stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke">
-          {[0, 90, 180, 270].map((a) => (
-            <ellipse key={a} cx={w * 0.27} cy={0} rx={w * 0.25} ry={w * 0.06} transform={`rotate(${a + 20})`} fill="#a9784a" />
-          ))}
-          <circle r={w * 0.1} fill="#fff7d6" />
-        </g>
-      )
-    case 'l-band':
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h * 0.3} fill="#fff7d6" stroke={dt.color} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
-          {[-0.4, -0.2, 0, 0.2, 0.4].map((k) => (
-            <circle key={k} cx={w * k} cy={0} r={h * 0.18} fill={dt.color} />
           ))}
         </g>
       )
@@ -328,15 +297,6 @@ function DeviceFaceBase({ dt }: { dt: DeviceType }) {
         <g>
           <rect x={-w / 2} y={-h / 2} width={w} height={h * 0.55} rx={h * 0.25} fill="#b8b8bd" stroke={SOFT} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
           <rect x={-w * 0.35} y={h * 0.15} width={w * 0.7} height={h * 0.35} fill="#fff7d6" opacity={0.7} />
-        </g>
-      )
-    case 'l-not':
-      return (
-        <g>
-          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h * 0.1} fill="#1f9d55" stroke={INK} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
-          <path d={`M ${-w * 0.36} 0 L ${-w * 0.16} ${-h * 0.25} L ${-w * 0.16} ${-h * 0.1} L ${w * 0.02} ${-h * 0.1} L ${w * 0.02} ${h * 0.1} L ${-w * 0.16} ${h * 0.1} L ${-w * 0.16} ${h * 0.25} Z`} fill="#fff" />
-          <circle cx={w * 0.2} cy={-h * 0.22} r={h * 0.07} fill="#fff" />
-          <path d={`M ${w * 0.2} ${-h * 0.12} L ${w * 0.3} ${h * 0.3} M ${w * 0.2} ${-h * 0.05} L ${w * 0.08} ${h * 0.15} M ${w * 0.2} ${-h * 0.02} L ${w * 0.34} ${h * 0.08}`} stroke="#fff" strokeWidth={3} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </g>
       )
     case 'l-aussen':

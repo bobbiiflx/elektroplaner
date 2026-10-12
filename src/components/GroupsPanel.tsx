@@ -34,12 +34,12 @@ export function GroupFields({ device }: { device: Device }) {
   return (
     <Section title="KNX-Gruppen">
       <p className="muted small">{isSender ? 'Sendet auf diese Gruppen.' : 'Empfängt von diesen Gruppen.'}</p>
-      <div className="chips">
+      <div className="gchips">
         {mine.map((id) => {
           const g = groups.find((x) => x.id === id)
           if (!g) return null
           return (
-            <span key={id} className="chip">
+            <span key={id} className="gchip">
               {g.name} <span className="muted">{g.ga}</span>
               <button className="icon-btn" title="Entfernen" onClick={() => setGroups((ids) => ids.filter((x) => x !== id))}>
                 <X size={12} />
@@ -182,11 +182,11 @@ export function GroupsOverview() {
                 {st.dim === 'all' ? ' · dimmbar' : ''}
               </p>
               {members.length > 0 && (
-                <div className="chips">
+                <div className="gchips">
                   {members.map((m) => (
                     <button
                       key={m.device.id}
-                      className="chip"
+                      className="gchip"
                       title="Gerät anzeigen"
                       onClick={() => {
                         setActiveFloor(m.floor.id)

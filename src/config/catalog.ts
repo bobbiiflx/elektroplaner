@@ -85,14 +85,10 @@ export const DEVICE_TYPES: DeviceType[] = [
   { id: 'ev', name: 'Ladesäule / Wallbox', category: 'iot', kind: 'load', defaultHeight: 700, w: 300, h: 1400, d: 250, color: '#32ade6', price: 900, boxPrice: 0, sizes: [{ id: 'e1', label: 'Wallbox kompakt 220 × 330', w: 220, h: 330 }, { id: 'e2', label: 'Ladesäule 300 × 1400', w: 300, h: 1400 }] },
   { id: 'l-spot', name: 'Einbau-Deckenstrahler', category: 'light', mount: 'ceiling', ceilingDrop: 0, defaultHeight: 0, w: 90, h: 60, d: 90, color: '#ffd60a', price: 12, boxPrice: 0, defaultPowerW: 6 },
   { id: 'l-pendel', name: 'Pendelleuchte', category: 'light', mount: 'ceiling', ceilingDrop: 700, defaultHeight: 0, w: 220, h: 300, d: 220, color: '#ffd60a', price: 90, boxPrice: 0, defaultPowerW: 10 },
-  { id: 'l-kron', name: 'Kronleuchter', category: 'light', mount: 'ceiling', ceilingDrop: 400, defaultHeight: 0, w: 600, h: 500, d: 600, color: '#ffd60a', price: 250, boxPrice: 0, defaultPowerW: 30 },
   { id: 'l-schiene', name: 'Stromschienen-System', category: 'light', mount: 'ceiling', ceilingDrop: 60, defaultHeight: 0, w: 1000, h: 130, d: 80, color: '#ffd60a', price: 110, boxPrice: 0, defaultPowerW: 16 },
-  { id: 'l-vent', name: 'Deckenventilator mit Leuchte', category: 'light', mount: 'ceiling', ceilingDrop: 250, defaultHeight: 0, w: 1100, h: 300, d: 1100, color: '#ffd60a', price: 220, boxPrice: 0, defaultPowerW: 24 },
-  { id: 'l-band', name: 'LED-Band (Voute / Unterbau)', category: 'light', mount: 'ceiling', ceilingDrop: 150, defaultHeight: 0, w: 1000, h: 25, d: 20, color: '#ffd60a', price: 40, boxPrice: 0, defaultPowerW: 24, defaultDimmable: true },
   { id: 'l-rgb', name: 'Smarte RGB-Leuchte (E27)', category: 'light', mount: 'ceiling', ceilingDrop: 200, defaultHeight: 0, w: 60, h: 110, d: 60, color: '#ffd60a', price: 25, boxPrice: 0, defaultPowerW: 9, defaultDimmable: true },
   { id: 'l-wand', name: 'Wandleuchte', category: 'light', defaultHeight: 1700, w: 110, h: 250, d: 110, color: '#ffd60a', price: 60, boxPrice: 1.2, box: true, defaultPowerW: 8 },
   { id: 'l-bild', name: 'Bilderleuchte', category: 'light', defaultHeight: 1900, w: 600, h: 60, d: 100, color: '#ffd60a', price: 55, boxPrice: 1.2, defaultPowerW: 8 },
-  { id: 'l-not', name: 'Notleuchte / Rettungszeichen', category: 'light', defaultHeight: 2300, w: 360, h: 150, d: 50, color: '#30d158', price: 85, boxPrice: 1.2, defaultPowerW: 3 },
   { id: 'l-decke', name: 'Deckenleuchte (Aufbau)', category: 'light', mount: 'ceiling', ceilingDrop: 35, defaultHeight: 0, w: 350, h: 70, d: 350, color: '#ffd60a', price: 45, boxPrice: 0, defaultPowerW: 18 },
   { id: 'l-panel', name: 'LED-Panel 60 × 60', category: 'light', mount: 'ceiling', ceilingDrop: 15, defaultHeight: 0, w: 600, h: 30, d: 600, color: '#ffd60a', price: 55, boxPrice: 0, defaultPowerW: 36 },
   { id: 'l-feucht', name: 'Feuchtraumleuchte (länglich)', category: 'light', mount: 'ceiling', ceilingDrop: 50, defaultHeight: 0, w: 600, h: 100, d: 150, color: '#ffd60a', price: 40, boxPrice: 0, defaultPowerW: 36 },
@@ -343,7 +339,7 @@ export function electricDefaults(dt: DeviceType): Partial<Device> {
   if (dt.defaultPowerW) out.powerW = dt.defaultPowerW
   if (kind === 'light' && dt.defaultDimmable !== undefined) {
     out.dimmable = dt.defaultDimmable
-    if (dt.defaultDimmable) out.dimType = dt.id === 'l-band' ? 'pwm' : 'phase'
+    if (dt.defaultDimmable) out.dimType = 'phase'
   }
   return out
 }
